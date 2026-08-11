@@ -1,10 +1,12 @@
 """Michell thin-ship wave-resistance model."""
 
 from .geometry import (
+    dufour_39_approx_hull,
     GeometryDiagnostics,
     HullGeometryWarning,
     HullMetadata,
     OffsetHull,
+    sailing_yacht_hull,
     wigley_hull,
 )
 from .models import (
@@ -28,6 +30,7 @@ from .validation import (
 
 __all__ = [
     "BatchWaveResistanceResult",
+    "dufour_39_approx_hull",
     "GeometryDiagnostics",
     "HullAttitude",
     "HullGeometryWarning",
@@ -37,6 +40,7 @@ __all__ = [
     "MichellSolver",
     "OffsetHull",
     "ResistanceQuantity",
+    "sailing_yacht_hull",
     "SolverSettings",
     "SpectralDensity",
     "ValidationMetrics",

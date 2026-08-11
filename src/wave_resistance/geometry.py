@@ -748,6 +748,34 @@ class OffsetHull:
             name=name,
         )
 
+    @classmethod
+    def sailing_yacht(
+        cls,
+        length_waterline_m: float,
+        waterline_beam_m: float,
+        displaced_volume_m3: float,
+        **kwargs: Any,
+    ) -> "OffsetHull":
+        """Construct a parametric modern sailing-yacht canoe body.
+
+        This is a convenience alias for :func:`sailing_yacht_hull`.  Shape
+        parameters such as ``widest_station_fraction`` may be supplied as
+        keyword arguments.
+        """
+
+        return sailing_yacht_hull(
+            length_waterline_m=length_waterline_m,
+            waterline_beam_m=waterline_beam_m,
+            displaced_volume_m3=displaced_volume_m3,
+            **kwargs,
+        )
+
+    @classmethod
+    def dufour_39_approx(cls, **kwargs: Any) -> "OffsetHull":
+        """Construct the refined smooth 2026 Dufour 39 analytical surrogate."""
+
+        return dufour_39_approx_hull(**kwargs)
+
 
 def wigley_hull(
     length_m: float = 1.0,
@@ -794,10 +822,271 @@ def wigley_hull(
     return OffsetHull(metadata, x, z, half_breadths)
 
 
+def sailing_yacht_hull(
+    length_waterline_m: float,
+    waterline_beam_m: float,
+    displaced_volume_m3: float,
+    *,
+    nx: int = 161,
+    nz: int = 65,
+    widest_station_fraction: float = 0.43,
+    aft_waterline_exponent: float = 0.55,
+    forward_waterline_exponent: float = 0.95,
+    section_power: float = 2.0,
+    midship_flare_power: float = 3.2,
+    end_flare_increment: float = 2.0,
+    bow_vee_increment: float = 1.0,
+    bow_vee_start_fraction: float = 0.62,
+    name: str = "Approximate modern sailing-yacht canoe body",
+) -> OffsetHull:
+    r"""Construct a transparent parametric sailing-yacht canoe body.
+
+    No measured or proprietary lines are used.  With ``xi=x/L`` and
+    ``eta=z/T``, the half-breadth is
+
+    .. math::
+
+       y = \frac{B_{WL}}{2}F(\xi)
+           \left(1-\eta^p\right)^{q(\xi)},
+
+    where ``F`` consists of two sine-power curves joined with zero slope at
+    ``widest_station_fraction``.  The aft and forward exponents independently
+    control the run and entrance.  The section exponent is
+
+    .. math::
+
+       q(\xi)=q_m+q_e[1-F(\xi)]
+       +q_b\left[\max\left(\frac{\xi-\xi_b}{1-\xi_b},0\right)\right]^2.
+
+    Thus sections become less full near both ends and acquire extra V-shape
+    towards the bow.  The canoe-body draft ``T`` is derived so that trapezoidal
+    integration of the returned offset tensor gives exactly
+    ``displaced_volume_m3`` (apart from roundoff).  This makes the volume
+    calibration reproducible at every requested grid resolution.
+
+    The tensor closes on the centreplane at the deepest row and is pointed at
+    both endpoints, as required by :class:`OffsetHull` and the present Michell
+    implementation.  Real transoms, chines, keels, rudders and above-water
+    topsides are not represented.  This smooth bare-canoe surrogate is therefore
+    suitable for sensitivity studies, not construction, stability work or an
+    assertion of vessel-identical resistance.
+    """
+
+    def positive_finite(value: float, parameter: str) -> float:
+        resolved = float(value)
+        if not math.isfinite(resolved) or resolved <= 0.0:
+            raise ValueError("{} must be finite and strictly positive".format(parameter))
+        return resolved
+
+    if isinstance(nx, bool) or not isinstance(nx, (int, np.integer)) or nx < 3:
+        raise ValueError("nx must be an integer of at least 3")
+    if isinstance(nz, bool) or not isinstance(nz, (int, np.integer)) or nz < 2:
+        raise ValueError("nz must be an integer of at least 2")
+
+    length = positive_finite(length_waterline_m, "length_waterline_m")
+    beam = positive_finite(waterline_beam_m, "waterline_beam_m")
+    target_volume = positive_finite(displaced_volume_m3, "displaced_volume_m3")
+    maximum_location = float(widest_station_fraction)
+    if not math.isfinite(maximum_location) or not 0.0 < maximum_location < 1.0:
+        raise ValueError("widest_station_fraction must lie strictly between 0 and 1")
+    aft_exponent = positive_finite(aft_waterline_exponent, "aft_waterline_exponent")
+    forward_exponent = positive_finite(
+        forward_waterline_exponent, "forward_waterline_exponent"
+    )
+    vertical_power = positive_finite(section_power, "section_power")
+    base_flare = positive_finite(midship_flare_power, "midship_flare_power")
+    end_flare = float(end_flare_increment)
+    bow_vee = float(bow_vee_increment)
+    if not math.isfinite(end_flare) or end_flare < 0.0:
+        raise ValueError("end_flare_increment must be finite and non-negative")
+    if not math.isfinite(bow_vee) or bow_vee < 0.0:
+        raise ValueError("bow_vee_increment must be finite and non-negative")
+    bow_vee_start = float(bow_vee_start_fraction)
+    if not math.isfinite(bow_vee_start) or not 0.0 <= bow_vee_start < 1.0:
+        raise ValueError("bow_vee_start_fraction must lie in [0, 1)")
+
+    xi = np.linspace(0.0, 1.0, int(nx))
+    eta = np.linspace(0.0, 1.0, int(nz))
+    longitudinal = np.empty_like(xi)
+    aft = xi <= maximum_location
+    aft_argument = np.clip(xi[aft] / maximum_location, 0.0, 1.0)
+    forward_argument = np.clip(
+        (1.0 - xi[~aft]) / (1.0 - maximum_location), 0.0, 1.0
+    )
+    longitudinal[aft] = np.sin(0.5 * np.pi * aft_argument) ** aft_exponent
+    longitudinal[~aft] = (
+        np.sin(0.5 * np.pi * forward_argument) ** forward_exponent
+    )
+    # Force exact closures independently of floating-point sine evaluation.
+    longitudinal[0] = 0.0
+    longitudinal[-1] = 0.0
+
+    bow_progress = np.clip(
+        (xi - bow_vee_start) / (1.0 - bow_vee_start), 0.0, 1.0
+    )
+    flare = (
+        base_flare
+        + end_flare * (1.0 - longitudinal)
+        + bow_vee * bow_progress * bow_progress
+    )
+    vertical_base = np.maximum(1.0 - eta**vertical_power, 0.0)
+    shape = longitudinal[:, None] * vertical_base[None, :] ** flare[:, None]
+    shape[0, :] = 0.0
+    shape[-1, :] = 0.0
+    shape[:, -1] = 0.0
+
+    # Since y=(B/2)*shape, x=L*xi and z=T*eta, volume is
+    # L*B*T times this dimensionless double integral.  Evaluating it with the
+    # same trapezoidal rule as OffsetHull makes the discrete target exact.
+    section_coefficients = _integrate(shape, eta, axis=1)
+    volume_coefficient = float(_integrate(section_coefficients, xi, axis=0))
+    if not math.isfinite(volume_coefficient) or volume_coefficient <= 0.0:
+        raise ValueError("shape parameters do not enclose a positive volume")
+    draft = target_volume / (length * beam * volume_coefficient)
+    if not math.isfinite(draft) or draft <= 0.0:
+        raise ValueError("derived canoe-body draft is not finite and positive")
+
+    x = length * xi
+    z = draft * eta
+    half_breadths = 0.5 * beam * shape
+    metadata = HullMetadata(
+        schema_version="1.0",
+        name=name,
+        length_ref_m=length,
+        length_ref_kind="LWL",
+        wetted_area_m2=_wetted_surface_area(x, z, half_breadths),
+        beam_m=beam,
+        draft_m=draft,
+    )
+    return OffsetHull(metadata, x, z, half_breadths)
+
+
+def dufour_39_approx_hull(
+    *,
+    nx: int = 201,
+    nz: int = 129,
+    waterline_beam_m: float = 3.70,
+    canoe_body_volume_m3: float = 8.00,
+    maximum_hull_beam_m: float = 4.10,
+    name: str = "Dufour 39 refined smooth bare canoe body (not builder lines)",
+) -> OffsetHull:
+    """Return a Michell-compatible approximation to the 2026 Dufour 39.
+
+    Only public principal particulars inform this named preset: 12.00 m LOA,
+    11.27 m hull length, 10.50 m LWL, 4.10 m maximum hull beam, 8600 kg light
+    displacement and 1.95 m total draft.  These values are published by Dufour
+    at https://www.dufour-yachts.com/en/sailboats/dufour-39/ (accessed August
+    2026).  No builder offsets, drawings or reverse-engineered surface data are
+    used.
+
+    Michell's model needs the submerged bare canoe body, whose particulars are
+    not published.  The defaults therefore make two explicit assumptions:
+    ``BWL=3.70 m`` and bare-canoe volume ``8.00 m3``.  The latter is slightly
+    below ``8600/1025 = 8.39 m3`` so that keel and rudder volume are excluded.
+    The draft is derived to match that volume exactly on the requested grid.
+
+    The refined default uses 129 cosine-spaced vertical levels and a smoothly
+    varying superelliptic section family.  Midbody sections have rounded bilges,
+    while the bow becomes progressively more V-shaped without introducing a
+    chine or a slope discontinuity.  The full bow and broad run reproduce the
+    published design description qualitatively; they are analytical assumptions,
+    not traced geometry.  The real open transom is forced to a pointed aft
+    closure; the keel, rudder, topsides and full 1.95 m draft are not modelled.
+
+    The represented ``BWL/LWL`` is about 0.35, well outside the package's
+    nominal slender-hull diagnostic threshold.  A converged Michell integral
+    for this surrogate should not be interpreted as validated Dufour 39 drag.
+    """
+
+    if isinstance(nx, bool) or not isinstance(nx, (int, np.integer)) or nx < 3:
+        raise ValueError("nx must be an integer of at least 3")
+    if isinstance(nz, bool) or not isinstance(nz, (int, np.integer)) or nz < 9:
+        raise ValueError("nz must be an integer of at least 9")
+    waterline_beam = float(waterline_beam_m)
+    target_volume = float(canoe_body_volume_m3)
+    maximum_beam = float(maximum_hull_beam_m)
+    for value, parameter in (
+        (waterline_beam, "waterline_beam_m"),
+        (target_volume, "canoe_body_volume_m3"),
+        (maximum_beam, "maximum_hull_beam_m"),
+    ):
+        if not math.isfinite(value) or value <= 0.0:
+            raise ValueError("{} must be finite and strictly positive".format(parameter))
+    if waterline_beam > maximum_beam:
+        raise ValueError("waterline_beam_m cannot exceed maximum_hull_beam_m")
+
+    length = 10.50
+    xi = np.linspace(0.0, 1.0, int(nx))
+    # Cosine spacing resolves the waterline and local centreline closures more
+    # strongly than a uniform grid, without a privileged chine level.
+    vertical_parameter = np.linspace(0.0, 1.0, int(nz))
+    eta = 0.5 * (1.0 - np.cos(np.pi * vertical_parameter))
+
+    widest_station = 0.43
+    longitudinal = np.empty_like(xi)
+    aft = xi <= widest_station
+    longitudinal[aft] = np.sin(
+        0.5 * np.pi * xi[aft] / widest_station
+    ) ** 0.55
+    longitudinal[~aft] = np.sin(
+        0.5 * np.pi * (1.0 - xi[~aft]) / (1.0 - widest_station)
+    ) ** 0.65
+    longitudinal[0] = 0.0
+    longitudinal[-1] = 0.0
+
+    bow_progress = np.clip((xi - 0.62) / 0.38, 0.0, 1.0)
+    # A simple rocker raises the canoe-body centreline towards both ends.
+    # Multiplication by the waterline curve preserves continuous pointed ends.
+    local_draft_fraction = longitudinal**0.45
+    eta_grid = eta[np.newaxis, :]
+    local_eta = eta_grid / np.maximum(local_draft_fraction[:, np.newaxis], 1.0e-15)
+    # Smooth superelliptic sections: p controls upper-body fullness and q the
+    # bilge/bottom transition.  Both vary continuously in x.  The bow is more
+    # V-shaped, but there is no piecewise join and hence no artificial chine.
+    section_power = (
+        2.15
+        - 0.30 * (1.0 - longitudinal)
+        - 0.28 * bow_progress * bow_progress
+    )
+    bottom_exponent = (
+        0.62
+        + 0.16 * (1.0 - longitudinal)
+        + 0.16 * bow_progress * bow_progress
+    )
+    vertical_base = np.maximum(
+        1.0 - local_eta ** section_power[:, np.newaxis], 0.0
+    )
+    section = vertical_base ** bottom_exponent[:, np.newaxis]
+    section = np.where(local_eta <= 1.0, section, 0.0)
+    shape = longitudinal[:, np.newaxis] * section
+    shape[0, :] = 0.0
+    shape[-1, :] = 0.0
+    shape[:, -1] = 0.0
+
+    section_coefficients = _integrate(shape, eta, axis=1)
+    volume_coefficient = float(_integrate(section_coefficients, xi, axis=0))
+    draft = target_volume / (length * waterline_beam * volume_coefficient)
+    x = length * xi
+    z = draft * eta
+    half_breadths = 0.5 * waterline_beam * shape
+    metadata = HullMetadata(
+        schema_version="1.0",
+        name=name,
+        length_ref_m=length,
+        length_ref_kind="LWL",
+        wetted_area_m2=_wetted_surface_area(x, z, half_breadths),
+        beam_m=maximum_beam,
+        draft_m=draft,
+    )
+    return OffsetHull(metadata, x, z, half_breadths)
+
+
 __all__ = [
+    "dufour_39_approx_hull",
     "GeometryDiagnostics",
     "HullGeometryWarning",
     "HullMetadata",
     "OffsetHull",
+    "sailing_yacht_hull",
     "wigley_hull",
 ]

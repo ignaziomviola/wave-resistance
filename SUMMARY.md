@@ -95,7 +95,7 @@ certify the tail before `lambda=1e4` or 4096 cycles returns
 
 ## Verification evidence
 
-The test suite currently contains 58 passing tests. It covers analytic cell
+The test suite currently contains 61 passing tests. It covers analytic cell
 moments, direct/offset agreement, malformed geometry, transom and flat-bottom
 rejection, positivity, zero hull, translation, reversal and scale invariance,
 oscillatory alias detection, refinement and validation metrics.
@@ -110,6 +110,23 @@ the analytic Wigley Michell amplitude:
 
 The detailed results, verification metadata, plot and notebook are in
 `examples/`.
+
+## Refined Dufour 39-inspired surrogate
+
+The repository also contains a smooth analytical bare-canoe surrogate based on
+the published principal dimensions of the 2026 Dufour 39, but not on builder
+offsets. It uses `LWL=10.50 m`, assumed `BWL=3.70 m`, volume `8.00 m³`, a
+derived canoe-body draft of `0.4148 m`, and a `201 × 129` tensor grid. The
+vertical levels are cosine-spaced and the transverse sections are continuously
+varying superellipses without an artificial chine.
+
+A 15-point Michell sweep over `Fn=0.10:0.025:0.45` converged at every point.
+It predicts `Rw=64.65 N` at `Fn=0.10` and `Rw=5728.44 N` at `Fn=0.45`, with
+the expected interference structure between. These values are screening
+outputs only: the represented breadth and end slopes violate strict thin-ship
+criteria, while keel, rudder, viscosity, dynamic attitude and the real open
+transom are excluded. Geometry, plots, offsets and the result table are in
+`examples/dufour_39_*`.
 
 ## Installation and execution
 
@@ -153,7 +170,7 @@ in this repository.
 
 - `src/wave_resistance/`: computational package;
 - `tests/`: automated verification suite;
-- `examples/`: Wigley script, notebook, curve and numerical results;
+- `examples/`: Wigley and refined Dufour scripts, geometry, plots and results;
 - `README.md`: installation, API, theory and validation guide;
 - `pyproject.toml`: build metadata and dependencies.
 

@@ -7,9 +7,11 @@ from pathlib import Path
 import numpy as np
 
 from wave_resistance.geometry import (
+    dufour_39_approx_hull,
     HullGeometryWarning,
     HullMetadata,
     OffsetHull,
+    sailing_yacht_hull,
     wigley_hull,
 )
 
@@ -182,6 +184,56 @@ class OffsetHullTests(unittest.TestCase):
             hull = wigley_hull(4.0, 1.0, 0.5, nx=11, nz=7)
         self.assertTrue(any(issubclass(item.category, HullGeometryWarning) for item in caught))
         self.assertIn("B/L", hull.diagnostics.validation_warnings[0])
+
+    def test_parametric_sailing_yacht_matches_requested_volume(self):
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", HullGeometryWarning)
+            hull = sailing_yacht_hull(10.0, 3.0, 6.5, nx=73, nz=29)
+        self.assertEqual(hull.half_breadths.shape, (73, 29))
+        self.assertAlmostEqual(hull.displaced_volume, 6.5, places=12)
+        self.assertAlmostEqual(float(2.0 * np.max(hull.half_breadths)), 3.0, places=5)
+        np.testing.assert_array_equal(hull.half_breadths[0, :], 0.0)
+        np.testing.assert_array_equal(hull.half_breadths[-1, :], 0.0)
+        np.testing.assert_array_equal(hull.half_breadths[:, -1], 0.0)
+
+    def test_dufour_39_surrogate_contract_smooth_sections_and_warning(self):
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            hull = dufour_39_approx_hull(nx=101, nz=97)
+
+        self.assertEqual(hull.half_breadths.shape, (101, 97))
+        self.assertAlmostEqual(hull.metadata.length_ref_m, 10.50)
+        self.assertAlmostEqual(hull.beam_m, 4.10)
+        self.assertAlmostEqual(float(2.0 * np.max(hull.half_breadths)), 3.70)
+        self.assertAlmostEqual(hull.displaced_volume, 8.00, places=12)
+        self.assertTrue(0.40 < hull.draft_m < 0.60)
+        self.assertLess(np.min(np.diff(hull.z)), 0.05 * np.max(np.diff(hull.z)))
+        self.assertTrue(any(issubclass(item.category, HullGeometryWarning) for item in caught))
+        self.assertTrue(any("B/L" in item for item in hull.diagnostics.validation_warnings))
+        self.assertTrue(
+            any("represents only" in item for item in hull.diagnostics.validation_warnings)
+        )
+
+        station = int(np.argmax(hull.half_breadths[:, 0]))
+        section = hull.half_breadths[station]
+        positive = np.flatnonzero(section > 1.0e-12)
+        closure = min(int(positive[-1]) + 1, hull.z.size - 1)
+        tangent_angles = np.arctan2(
+            np.diff(hull.z[: closure + 1]),
+            -np.diff(section[: closure + 1]),
+        )
+        interior_angle_jumps = np.abs(np.diff(tangent_angles[2:-2]))
+        self.assertLess(float(np.max(interior_angle_jumps)), 0.06)
+
+    def test_dufour_39_surrogate_classmethod_and_invalid_beam(self):
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", HullGeometryWarning)
+            coarse = OffsetHull.dufour_39_approx(nx=41, nz=17)
+            fine = dufour_39_approx_hull(nx=121, nz=49)
+        self.assertAlmostEqual(coarse.displaced_volume, 8.0, places=12)
+        self.assertAlmostEqual(fine.displaced_volume, 8.0, places=12)
+        with self.assertRaisesRegex(ValueError, "cannot exceed"):
+            dufour_39_approx_hull(waterline_beam_m=4.2)
 
     def test_csv_and_both_json_encodings_load(self):
         long_offsets = [

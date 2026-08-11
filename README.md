@@ -140,6 +140,77 @@ It is accompanied by a JSON file containing:
 
 Load both with `OffsetHull.from_csv("offsets.csv", "metadata.json")`.
 
+## Dufour 39 analytical surrogate
+
+The package includes a named approximation to the current 2026 Dufour 39:
+
+```python
+from wave_resistance import dufour_39_approx_hull
+
+hull = dufour_39_approx_hull(nx=201, nz=129)
+print(hull.diagnostics)
+```
+
+The published particulars used are 12.00 m LOA, 11.27 m hull length, 10.50 m
+LWL, 4.10 m maximum hull beam, 1.95 m total draft and 8600 kg unloaded
+displacement. The builder also describes a chined hull with generous beam and
+bow volume. Source: [Dufour Yachts, Dufour 39
+specifications](https://www.dufour-yachts.com/en/sailboats/dufour-39/).
+
+No builder offsets are public, so this is explicitly an analytical surrogate,
+not a reconstruction of production geometry. It assumes `BWL=3.70 m` and an
+8.00 m³ bare-canoe volume, giving a derived canoe-body draft of about 0.415 m.
+The refined geometry uses 129 cosine-spaced vertical levels and continuously
+varying superelliptic sections: rounded amidships and progressively more
+V-shaped forward, with no artificial chine or slope discontinuity. Keel,
+rudder and topsides are omitted, and the real open transom is replaced by the
+pointed closure required by this Michell implementation. The resulting
+`BWL/LWL≈0.35` is outside thin-ship proportions; any resistance result must be
+treated as a screening estimate.
+
+Run the three-view plot and export the canonical offsets with:
+
+```bash
+python examples/dufour_39_hull.py \
+    --output examples/dufour_39_hull.png \
+    --offsets-csv examples/dufour_39_offsets.csv \
+    --metadata-json examples/dufour_39_metadata.json
+```
+
+The generated [hull plot](examples/dufour_39_hull.png),
+[offsets](examples/dufour_39_offsets.csv) and
+[metadata with provenance](examples/dufour_39_metadata.json) are included.
+
+A conventional three-view lines plan of the same analytical canoe body is
+generated with:
+
+```bash
+python examples/dufour_39_lines_plan.py
+```
+
+The vector [SVG drawing](examples/dufour_39_lines_plan.svg) and high-resolution
+[PNG drawing](examples/dufour_39_lines_plan.png) contain 21 stations, eight
+waterlines and four buttocks. They remain model documentation, not builder or
+construction drawings.
+
+Run the refined geometry and Michell resistance sweep with:
+
+```bash
+python examples/dufour_39_refined_analysis.py
+```
+
+This evaluates 15 speeds over `Fn=0.10:0.025:0.45` using a numerical relative
+tolerance of `1e-5`. The generated [geometry and resistance
+plot](examples/dufour_39_refined_analysis.png) and [result
+table](examples/dufour_39_refined_resistance.csv) include convergence and tail
+diagnostics. All 15 cases converge numerically. The persistent breadth and
+longitudinal-slope flags mean the curve remains a thin-ship screening result,
+not a validated resistance prediction for the complete yacht.
+
+The illustrated [technical report](examples/DUFOUR_39_REFINED_REPORT.md)
+documents the analytical geometry, hydrostatics, numerical settings, complete
+resistance table, interpretation and limitations.
+
 ## Physical and numerical limits
 
 Michell theory assumes a slender hull, small disturbance, steady forward

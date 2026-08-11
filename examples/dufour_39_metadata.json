@@ -1,0 +1,31 @@
+{
+  "schema_version": "1.0",
+  "name": "Dufour 39 refined smooth bare canoe body (not builder lines)",
+  "length_ref_m": 10.5,
+  "length_ref_kind": "LWL",
+  "wetted_area_m2": 31.90526346389406,
+  "beam_m": 4.1,
+  "draft_m": 0.4148008581108433,
+  "provenance": {
+    "source": "Dufour Yachts, Dufour 39 specifications",
+    "url": "https://www.dufour-yachts.com/en/sailboats/dufour-39/",
+    "accessed": "2026-08-10"
+  },
+  "published_particulars": {
+    "length_overall_m": 12.0,
+    "hull_length_m": 11.27,
+    "waterline_length_m": 10.5,
+    "maximum_hull_beam_m": 4.1,
+    "total_draft_m": 1.95,
+    "unloaded_displacement_kg": 8600.0
+  },
+  "analytical_assumptions": {
+    "waterline_beam_m": 3.7,
+    "bare_canoe_volume_m3": 8.0,
+    "smooth_superelliptic_sections": true,
+    "cosine_spaced_vertical_levels": 129,
+    "real_transom_replaced_by_pointed_closure": true,
+    "keel_rudder_and_topsides_excluded": true,
+    "builder_offsets_used": false
+  }
+}
