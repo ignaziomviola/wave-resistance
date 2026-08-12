@@ -14,7 +14,7 @@ from .models import (
     WaterProperties,
     WaveResistanceResult,
 )
-from .kochin import kochin_wave_coefficient
+from .kochin import kochin_amplitude, kochin_wave_coefficient, kochin_wave_pattern
 from .reference import wigley_michell_amplitude, wigley_michell_coefficient
 from .solver import LinearFreeSurfaceSolver
 from .wave_pattern import transverse_energy_flux_coefficient, wave_pattern_coefficient
@@ -30,7 +30,9 @@ __all__ = [
     "WaterProperties",
     "WaveResistanceResult",
     "image_inspired_yacht",
+    "kochin_amplitude",
     "kochin_wave_coefficient",
+    "kochin_wave_pattern",
     "transverse_energy_flux_coefficient",
     "wave_pattern_coefficient",
     "wigley_hull",

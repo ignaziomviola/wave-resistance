@@ -107,6 +107,24 @@ curve, three-grid convergence data, the free-surface field, and both figures.
 For `Fn >= 0.20`, the maximum change from the `41 x 15` to `51 x 19` hull grid
 is 1.7%. At `Fn=0.15-0.175`, relative convergence is slower and reaches 3.5%.
 
+## Journal-style test case
+
+The [LaTeX article](article/main.tex) applies the method to a 10 m version of
+the image-inspired yacht in seawater. It contains the full formulation,
+hydrostatics, a three-grid study, Wigley/Michell verification, Kochin spectra,
+and normalized wave-pattern maps at six Froude numbers from 0.20 to 0.45. The
+compiled [manuscript](article/main.pdf) uses the JFM class and VOILAb writing
+guidelines from the supplied Overleaf project.
+
+Regenerate every tabulated result and figure with:
+
+```bash
+python examples/journal_test_case.py
+```
+
+The exact CSV, JSON and NPZ data are in [`article/data`](article/data), and all
+publication figures are in [`article/figures`](article/figures).
+
 ## Command line
 
 ```bash
@@ -144,7 +162,7 @@ Or, after installing the test extra:
 python -m pytest
 ```
 
-The tests cover geometry and hydrostatics, source kernels, singular jump terms,
+The 20 tests cover geometry and hydrostatics, source kernels, singular jump terms,
 free-surface exclusion, dimensional scaling, exports, numerical residuals,
 Kochin tails, and a slender Wigley limit. On a `41 x 15` half-hull grid, the
 three-dimensional Kochin result agrees with the independent Michell solution

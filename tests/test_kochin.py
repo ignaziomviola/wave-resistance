@@ -9,7 +9,11 @@ from wave_resistance import (
     wigley_hull,
     wigley_michell_coefficient,
 )
-from wave_resistance.kochin import kochin_wave_coefficient
+from wave_resistance.kochin import (
+    kochin_amplitude,
+    kochin_wave_coefficient,
+    kochin_wave_pattern,
+)
 
 
 class KochinTests(unittest.TestCase):
@@ -56,6 +60,38 @@ class KochinTests(unittest.TestCase):
         )
         self.assertEqual(coefficient, 0.0)
         self.assertEqual(tail, 0.0)
+
+    def test_amplitude_and_wave_pattern_are_symmetric(self):
+        points = np.array([[0.1, 0.08, -0.06], [-0.1, 0.04, -0.03]])
+        areas = np.array([0.02, 0.015])
+        strengths = np.array([0.4, -0.2])
+        t, lam, amplitude = kochin_amplitude(
+            points,
+            areas,
+            strengths,
+            0.3,
+            integration_points=1001,
+            t_max=8.0,
+        )
+        self.assertEqual(t.shape, lam.shape)
+        self.assertEqual(t.shape, amplitude.shape)
+        self.assertTrue(np.all(np.isfinite(amplitude)))
+
+        x = np.linspace(0.6, 1.6, 24)
+        y = np.linspace(-0.8, 0.8, 31)
+        pattern = kochin_wave_pattern(
+            points,
+            areas,
+            strengths,
+            0.3,
+            x,
+            y,
+            integration_points=1001,
+            t_max=8.0,
+        )
+        self.assertEqual(pattern.shape, (y.size, x.size))
+        self.assertTrue(np.allclose(pattern, pattern[::-1], atol=1.0e-12))
+        self.assertAlmostEqual(float(np.max(np.abs(pattern))), 1.0, places=12)
 
 
 if __name__ == "__main__":

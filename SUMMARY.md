@@ -10,7 +10,8 @@ Version 0.2 is a clean rewrite for upright displacement monohulls. It contains:
 - a positive-definite Kochin far-field wave-resistance calculation;
 - an experimental coupled hull/free-surface boundary-element field solve;
 - an image-inspired generic yacht and Wigley benchmark;
-- 19 automated tests and reproducible example artifacts.
+- a nine-page JFM-style numerical test-case article with six figures;
+- 20 automated tests and reproducible example artifacts.
 
 ## Primary model
 
@@ -44,6 +45,8 @@ finite breadth, exact panel orientation, and three-dimensional interference.
   `Fn>=0.20`, and 3.5% over the complete `0.15-0.45` sweep.
 - The maximum retained Kochin tail is approximately `5.1e-4`.
 - The source image envelope fit errors are 0.3% of half-beam and 0.7% of draft.
+- The article test case provides six normalized Kochin wave-pattern maps from
+  `Fn=0.20` to `0.45`, as well as the exact underlying NPZ arrays.
 
 ## Interpretation
 

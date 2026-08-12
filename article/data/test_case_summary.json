@@ -1,0 +1,58 @@
+{
+  "case": {
+    "hull": "Image-inspired generic displacement yacht",
+    "length_m": 10.0,
+    "beam_m": 2.7990917418326156,
+    "draft_m": 0.5999983726223531,
+    "displacement_volume_m3": 7.110864281690717,
+    "displacement_mass_kg": 7288.635888732985,
+    "wetted_area_m2": 21.759725364152622,
+    "waterplane_area_m2": 17.948149954220696,
+    "longitudinal_center_of_buoyancy_from_midships_m": 0.3952699029363973,
+    "beam_over_length": 0.27990917418326156,
+    "draft_over_length": 0.05999983726223531,
+    "volume_over_length_cubed": 0.007110864281690717,
+    "water_density_kg_m3": 1025.0,
+    "gravity_m_s2": 9.80665
+  },
+  "grids": {
+    "coarse": {
+      "stations": 31,
+      "vertical_points": 13,
+      "half_hull_panels": 696,
+      "maximum_kochin_tail_fraction": 0.0005547053505987808
+    },
+    "medium": {
+      "stations": 41,
+      "vertical_points": 15,
+      "half_hull_panels": 1092,
+      "maximum_kochin_tail_fraction": 0.0005372865765794931
+    },
+    "fine": {
+      "stations": 51,
+      "vertical_points": 19,
+      "half_hull_panels": 1764,
+      "maximum_kochin_tail_fraction": 0.0005095837597707021
+    }
+  },
+  "convergence": {
+    "maximum_fine_medium_relative_change_all_froude": 0.03453009152642953,
+    "maximum_fine_medium_relative_change_fn_ge_0p20": 0.01712894014680893,
+    "mean_fine_medium_relative_change_fn_ge_0p20": 0.003600346268030318
+  },
+  "principal_result": {
+    "peak_froude_number": 0.425,
+    "peak_c_wave": 0.03859061740682152,
+    "peak_speed_m_s": 4.2087125777962076,
+    "peak_wave_resistance_N": 7612.667695862062
+  },
+  "verification": {
+    "maximum_absolute_relative_error": 0.05608851704970278,
+    "maximum_kochin_tail_fraction": 5.4871493056153355e-06
+  },
+  "software": {
+    "numpy_version": "2.0.2",
+    "python_script": "examples/journal_test_case.py",
+    "wave_pattern_note": "Kochin far-field phase reconstruction, independently normalized at each Froude number; not a dimensional free-surface elevation."
+  }
+}
