@@ -1,0 +1,15 @@
+{
+  "schema_version": "2.0",
+  "name": "Image-inspired generic displacement yacht",
+  "length_ref_m": 1.0,
+  "coordinate_system": "x bow-to-stern, y starboard, z upward; waterline z=0",
+  "provenance": "Parametric reconstruction of the immersed forms visible in yacht.pdf; nondimensional ratios selected independently because the raster has no common scale.",
+  "hydrostatics": {
+    "displacement_volume_m3": 0.0071108642816907165,
+    "longitudinal_center_of_buoyancy_m": 0.03952699029363974,
+    "waterplane_area_m2": 0.17948149954220696,
+    "wetted_area_m2": 0.2175972536415262,
+    "maximum_waterline_beam_m": 0.27990917418326156,
+    "maximum_canoe_draft_m": 0.05999983726223531
+  }
+}

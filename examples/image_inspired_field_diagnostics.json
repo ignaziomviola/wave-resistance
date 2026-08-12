@@ -1,0 +1,28 @@
+{
+  "length_ref_m": 1.0,
+  "wetted_area_m2": 0.21710933379948866,
+  "water": {
+    "density_kg_m3": 1025.0,
+    "gravity_m_s2": 9.80665
+  },
+  "cases": [
+    {
+      "unknown_count": 1284,
+      "matrix_condition": 1389.191669281759,
+      "relative_residual": 2.0430160757449558e-15,
+      "solver_backend": "numpy.solve",
+      "solver_iterations": 1,
+      "double_body_drag_coefficient": 2.0868074965122865e-05,
+      "kochin_wave_coefficient": 0.022880697505474144,
+      "kochin_tail_fraction": 5.122287611874885e-05,
+      "near_field_pressure_coefficient": 9.180564236441168e-05,
+      "wave_cut_energy_coefficient": 4.719551444428367e-08,
+      "pressure_kochin_difference": 0.9959876379493043,
+      "minimum_points_per_transverse_wavelength": 4.105014400690663,
+      "flags": [
+        "fewer than eight streamwise points per wavelength",
+        "near-field pressure and Kochin coefficients differ by more than 5%"
+      ]
+    }
+  ]
+}

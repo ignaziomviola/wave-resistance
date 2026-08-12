@@ -1,284 +1,176 @@
-# Wave resistance
+# Wave resistance of displacement yachts
 
-`wave-resistance` is a transparent low-order implementation of Michell's
-thin-ship theory for the steady wave-making resistance of a displacement
-vessel in deep, calm water. It accepts a tensor-product hull-offset surface,
-computes a resistance curve over Froude number, and reports numerical and
-validity diagnostics alongside every result.
+`wave-resistance` is a transparent Python research code for the steady,
+deep-water wave-making resistance of symmetric displacement monohulls. Version
+0.2 replaces the original thin-ship-only implementation with a three-dimensional
+Rankine-source formulation, a triangular hull panel model, a positive-definite
+Kochin far-field resistance integral, and an experimental coupled free-surface
+field solver.
 
-The package predicts the **wave-making component only**. It is not a total
-resistance or powering model: skin friction, viscous pressure drag,
-appendages, air drag, roughness and propulsion are outside its scope.
+The code predicts **wave-making resistance only**. It is not a total-resistance,
+powering, velocity-prediction, or sailing-equilibrium program. Viscous drag,
+appendages, heel, leeway, sinkage, trim, breaking waves, finite depth, roughness,
+windage, and propulsion are outside version 0.2.
 
-With every coordinate divided by the same reference length, the implemented
-amplitude and resistance are
+## Method in one paragraph
 
-\[
-a(\lambda)=\iint Y_X e^{-\lambda^2 Z/Fn^2}
-e^{-i\lambda X/Fn^2}\,dX\,dZ,
-\qquad
-I=\int_0^\infty\sqrt{1+t^2}\,
-|a(\sqrt{1+t^2})|^2\,dt,
-\]
+The mean immersed surface is triangulated on one half of a symmetric hull. A
+linear Havelock source strength `sigma=-n_x` is assigned to each three-dimensional
+panel. Its full breadth, depth, area, and transverse phase enter a Kochin
+far-field integral, so the method is not restricted to a centreplane thin-ship
+surface. An independent boundary-element solve enforces impermeability on the
+hull and the linear free-surface condition on a finite Rankine-source domain;
+it provides wave-elevation, pressure, matrix, and resolution diagnostics. The
+Kochin integral remains the reported resistance because it is positive definite
+and does not depend on truncating the numerical free-surface domain.
 
-\[
-R_W=\frac{4\rho gL^3}{\pi Fn^2}I,
-\qquad
-C_{R_w}=\frac{8I}{\pi Fn^4(S/L^2)}.
-\]
-
-The cell integrals are analytic for the bilinear offset interpolant; only the
-outer improper integral is evaluated numerically.
-
-Theory references: J. H. Michell, [*The wave-resistance of a
-ship*](https://doi.org/10.1080/14786449808621111), and Dambrine, Pierre and
-Rousseaux, [*A theoretical and numerical determination of optimal ship forms
-based on Michell's wave resistance*](https://www.numdam.org/item/10.1051/cocv/2014067.pdf).
+See [METHODOLOGY.md](docs/METHODOLOGY.md) for the complete equations and
+[VALIDATION.md](docs/VALIDATION.md) for the evidence and current limitations.
 
 ## Installation
 
-Python 3.9 or later and NumPy are required.
+Python 3.9 or later and NumPy are required:
 
 ```bash
 python -m pip install -e .
 ```
 
-Install plotting and test dependencies when needed:
+Optional packages provide plotting, tests, and GMRES for large systems:
 
 ```bash
-python -m pip install -e '.[plot,test]'
+python -m pip install -e '.[dev]'
 ```
+
+The dense NumPy solver is always available. SciPy is used automatically for
+systems larger than `SolverSettings.direct_unknown_limit` when installed.
 
 ## Quick start
 
 ```python
 import numpy as np
 
-from wave_resistance import MichellSolver, wigley_hull
+from wave_resistance import LinearFreeSurfaceSolver, image_inspired_yacht
 
-hull = wigley_hull(length_m=4.0, nx=161, nz=65)
-fn = np.linspace(0.15, 0.45, 61)
-result = MichellSolver().solve(hull, fn)
-
-print(result.c_wave_resistance)
-print(result.wave_resistance_N)
-print(result.converged)
-print(result.validity_flags)
-result.to_csv("wigley_results.csv")
-```
-
-`WaveResistanceResult` contains, point by point:
-
-- `fn`, `speed_m_s`, `wave_resistance_N` and `c_wave_resistance`;
-- the nondimensional Michell `integral`;
-- `quadrature_error`, `tail_fraction` and `cancellation_ratio` diagnostics;
-- `converged` and human-readable `validity_flags`;
-- optional `spectral_density` when `include_spectrum=True`.
-
-The coefficient is
-
-\[
-C_W=\frac{R_W}{\tfrac12\rho U^2 S},
-\qquad Fn=\frac{U}{\sqrt{gL}},
-\]
-
-where `L` is the hull metadata reference length and `S` its static wetted
-surface area. SI units are used throughout.
-
-## Hull geometry
-
-`OffsetHull` represents half-breadths `y(x,z)` on a tensor grid. Coordinates
-use `x=0` at the aft end, `x=L` at the forward end, and positive `z` downward
-from the undisturbed waterplane. Geometry constructors validate ordering,
-coverage, finite values and metadata before a solve.
-
-The built-in canonical hull is
-
-```python
-from wave_resistance import wigley_hull
-
-hull = wigley_hull(
-    length_m=4.0,
-    beam_m=0.4,       # optional; default L/10
-    draft_m=0.25,     # optional; default B/1.6
-    nx=161,
-    nz=65,
+hull = image_inspired_yacht()
+result = LinearFreeSurfaceSolver().solve(
+    hull,
+    np.arange(0.20, 0.451, 0.05),
+    retain_wave_fields=True,
 )
-print(hull.diagnostics)
+
+print(result.wave_resistance_coefficient)      # primary Kochin C_W
+print(result.near_field_pressure_coefficient)  # finite-domain diagnostic
+print(result.diagnostics[0].flags)
+result.to_csv("resistance.csv")
+result.wave_fields_to_npz("wave_fields.npz")
 ```
 
-Its half-breadth is the parabolic Wigley form
+The coefficient and dimensional force are
 
 \[
-y=\frac{B}{2}\left[1-\left(\frac{2x}{L}-1\right)^2\right]
-  \left[1-\left(\frac{z}{T}\right)^2\right].
+C_W=\frac{R_W}{\tfrac12\rho U^2S},\qquad
+R_W=\tfrac12\rho U^2S C_W,\qquad
+Fn=\frac{U}{\sqrt{gL}},
 \]
 
-`OffsetHull.from_csv`, `OffsetHull.from_json` and
-`OffsetHull.from_irregular` support user-supplied offsets; see their
-docstrings for the schema and interpolation rules.
+where `L` is the declared reference waterline length and `S` is the static
+bare-canoe wetted area calculated from the panels.
 
-The canonical long-form CSV is:
+## Generic image-inspired yacht
+
+The first example reconstructs the immersed character of the uploaded raster
+lines plan: a fine bow, fuller stern, smooth keel rocker, rounded bilges, and
+U-shaped midbody. The source drawing contains neither dimensions nor recoverable
+vector offsets, so the example is deliberately nondimensional:
+
+- `LWL = 1`;
+- `BWL/LWL = 0.28`;
+- `Tc/LWL = 0.06`;
+- bare, upright canoe body only.
+
+It is a **generic geometry, not a Dufour 39 reconstruction**. Details of the
+tracing and fit are in [GEOMETRY_RECONSTRUCTION.md](docs/GEOMETRY_RECONSTRUCTION.md).
+
+Run the complete reproducible example:
+
+```bash
+MPLCONFIGDIR=/tmp/wave-resistance-mpl \
+  python examples/image_inspired_yacht.py
+```
+
+![Image-inspired geometry and resistance](examples/image_inspired_geometry_and_resistance.png)
+
+![Computed linear free-surface field](examples/image_inspired_wave_field.png)
+
+The committed outputs include normalized offsets and metadata, the resistance
+curve, three-grid convergence data, the free-surface field, and both figures.
+For `Fn >= 0.20`, the maximum change from the `41 x 15` to `51 x 19` hull grid
+is 1.7%. At `Fn=0.15-0.175`, relative convergence is slower and reaches 3.5%.
+
+## Command line
+
+```bash
+wave-resistance \
+  --hull image-inspired \
+  --fn 0.20:0.45:0.05 \
+  --retain-wave-fields \
+  --output-dir output/run
+```
+
+Canonical external offsets use one row per ordered section point:
 
 ```text
-x_m,z_m,half_breadth_m
-0.0,0.0,0.0
+station_index,point_index,x_m,z_m,half_breadth_m
+0,0,-0.5,0.0,0.0
 ...
 ```
 
-It is accompanied by a JSON file containing:
+Coordinates are body fixed: `x` increases from bow to stern with the oncoming
+flow, `y` is positive to starboard, and `z` is positive upwards. Each station
+runs from the waterline to the keel or centreline. Use `--hull csv --offsets
+hull.csv --metadata hull.json` for external geometry.
 
-```json
-{
-  "schema_version": "1.0",
-  "name": "Example hull",
-  "length_ref_m": 4.0,
-  "length_ref_kind": "LWL",
-  "wetted_area_m2": 2.38
-}
-```
+## Verification
 
-Load both with `OffsetHull.from_csv("offsets.csv", "metadata.json")`.
-
-## Physical and numerical limits
-
-Michell theory assumes a slender hull, small disturbance, steady forward
-motion, inviscid irrotational flow, a linear free surface and effectively
-deep water. The present hull is fixed at its input waterline and attitude.
-The model does not resolve dynamic sinkage and trim, transom separation,
-spray, breaking waves or finite-depth effects.
-
-The default declared envelope is `0.10 <= Fn <= 0.45`. Results outside the
-envelope are rejected unless explicitly enabled in `SolverSettings`; enabled
-out-of-envelope results remain flagged. A converged quadrature is not evidence
-that the physical assumptions are valid, so inspect both `converged` and
-`validity_flags`.
-
-## Validation without semantic shortcuts
-
-Towing-tank publications report several distinct resistance quantities.
-`wave_resistance.validation` keeps them separate:
-
-| `ResistanceQuantity` | Meaning | Symbol |
-|---|---|---|
-| `TOTAL` | measured total resistance | `C_T` |
-| `RESIDUARY` | `C_T - (1+k) C_F` | `C_R` |
-| `WAVE_MAKING` | wave-making force | `C_W` |
-| `WAVE_PATTERN` | far-field wave-analysis result | `C_WP` |
-
-It also records the experimental attitude:
-
-| `HullAttitude` | ITTC code | Meaning |
-|---|---|---|
-| `FIXED` | `FX` | sinkage and trim fixed |
-| `FREE_SINKAGE` | `FS` | free to sink only |
-| `FREE_SINKAGE_TRIM` | `FR` | free to sink and trim |
-
-These categories are not silently converted. In particular, `C_R` is not
-assumed to equal `C_W`, and a fixed Michell prediction cannot be scored
-against a free-running experiment. `C_WP` is also not used as an automatic
-proxy for `C_W`. This prevents a numerically precise but physically invalid
-score.
-
-Load a header-based experimental CSV and compare it with a result:
-
-```text
-fn,value,quantity,uncertainty,attitude,source
-0.20,0.00070,wave_making,0.00002,fixed,Tank A
-0.30,0.00120,wave_making,0.00003,fixed,Tank A
-```
-
-```python
-from wave_resistance.validation import (
-    HullAttitude,
-    ResistanceQuantity,
-    ValidationSeries,
-)
-
-observed = ValidationSeries.from_csv(
-    "wigley_cw.csv"
-)
-
-predicted = ValidationSeries(
-    result.fn,
-    result.c_wave_resistance,
-    quantity=ResistanceQuantity.WAVE_MAKING,
-    attitude=HullAttitude.FIXED,
-    label="Michell model",
-)
-
-report = observed.compare(predicted)
-print(report.to_text())
-print(report.metrics.as_dict())
-```
-
-Predictions are linearly interpolated to the measured Froude numbers but are
-never extrapolated. Curve metrics use trapezoidal Froude-number weights:
-
-\[
-E_2=\left[\frac{\sum_i w_i(C_i^{model}-C_i^{exp})^2}
-{\sum_i w_i(C_i^{exp})^2}\right]^{1/2}.
-\]
-
-The report also gives signed bias and mean absolute error in drag counts
-(`1 count = 10^-4` in coefficient), maximum absolute error and its Froude
-number, and location errors for the dominant interior hump and hollow. A
-relative pointwise percentage error is intentionally omitted because it is
-ill-conditioned near wave-resistance hollows.
-
-## Plotting example
-
-The same workflow is available interactively in
-[`examples/wigley_curve.ipynb`](examples/wigley_curve.ipynb).
-The repository also includes the verified 71-point
-[`wigley_results.csv`](examples/wigley_results.csv), its
-[`verification summary`](examples/wigley_verification.json), and the resulting
-[`curve`](examples/wigley_curve.png).
+Run the dependency-free test suite with:
 
 ```bash
-python examples/wigley_curve.py --output wigley_curve.png \
-    --result-csv wigley_results.csv
+PYTHONPATH=src python -m unittest discover -s tests -v
 ```
 
-To overlay licensed or locally held experimental data:
-
-```bash
-python examples/wigley_curve.py --validation wigley_cw.csv \
-    --validation-column C_W --output wigley_validation.png
-```
-
-The script prints the validation report and writes the plot. Matplotlib is
-imported only by the example and is not a core dependency.
-
-## Benchmark data and provenance
-
-No experimental data are redistributed with this repository. Widely used
-legacy data are publicly readable but generally do not state an open-data
-licence; free access is not permission to repackage them. Record the facility,
-model length, reference-length definition, wetted area, Reynolds number,
-temperature, turbulence stimulation, attitude, extraction method and source
-for every imported series.
-
-Useful primary sources include:
-
-- [17th ITTC Resistance Committee report](https://ittc.info/media/2212/report-of-resistance-committee.pdf): multi-laboratory Wigley and Series 60 total, component and wave-pattern data.
-- [ITTC benchmark list](https://www.ittc.info/media/11250/list-of-benchmarks-2.pdf): Series 60, KCS, DTMB 5415 and other canonical hulls.
-- [ITTC resistance-test procedure](https://ittc.info/media/11780/75-02-02-01.pdf): coefficient definitions and test semantics.
-- [ITTC uncertainty guide](https://www.ittc.info/media/9601/75-02-02-02.pdf): resistance-test uncertainty sources and propagation.
-- [ITTC wave-pattern procedure](https://www.ittc.info/media/11790/75-02-02-04.pdf): wave-profile measurement and far-field analysis.
-
-If plotted legacy values are digitised, retain that fact in `metadata` and
-include digitisation uncertainty. Prefer fixed-attitude data for direct
-comparison with this solver. Keep complete hull families out of calibration
-when assessing cross-hull predictive performance.
-
-## Tests
+Or, after installing the test extra:
 
 ```bash
 python -m pytest
 ```
 
-The test suite covers analytic/reference kernels, geometry ingestion,
-configuration/result contracts and validation metrics. Numerical refinement
-should be judged together with the reported quadrature and tail diagnostics,
-not solely by agreement with an experimental curve.
+The tests cover geometry and hydrostatics, source kernels, singular jump terms,
+free-surface exclusion, dimensional scaling, exports, numerical residuals,
+Kochin tails, and a slender Wigley limit. On a `41 x 15` half-hull grid, the
+three-dimensional Kochin result agrees with the independent Michell solution
+within 6% for all five points from `Fn=0.20` to `0.40`.
+
+## Scientific interpretation
+
+The generic yacht has `B/L=0.28` and therefore lies well outside strict
+thin-ship proportions. The three-dimensional phase treatment is more suitable
+than applying Michell's centreplane formula directly, but the current linear
+source model is still a screening method. The coupled near-field pressure and
+finite wave-cut diagnostics do not yet agree with the Kochin force to 5% on the
+compact default free-surface grid; every result records this discrepancy as a
+flag. Do not use the curve for design certification or powering without
+validation against fixed-attitude towing-tank, wave-pattern, or CFD data.
+
+## References
+
+- J. H. Michell, “The wave-resistance of a ship,” *Philosophical Magazine*,
+  1898, [doi:10.1080/14786449808621111](https://doi.org/10.1080/14786449808621111).
+- N. E. Markov and K. Suzuki, “Fundamental studies on Rankine source panel
+  method fully based on B-splines,” 2000,
+  [doi:10.2534/jjasnaoe1968.2000.13](https://doi.org/10.2534/jjasnaoe1968.2000.13).
+- D. Feng et al., “Numerical calculation of free-surface potential flow around
+  a ship using the modified Rankine source panel method,” *Ocean Engineering*,
+  2008, [doi:10.1016/j.oceaneng.2007.11.004](https://doi.org/10.1016/j.oceaneng.2007.11.004).
+- ITTC, “Wave Profile Measurement and Wave Pattern Resistance Analysis,”
+  Procedure 7.5-02-02-04, 2021,
+  [PDF](https://www.ittc.info/media/11790/75-02-02-04.pdf).

@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "wave-resistance"
-version = "0.1.0"
-description = "Low-order Michell thin-ship wave-resistance model"
+version = "0.2.0"
+description = "Research implementation of a 3-D linear free-surface Rankine-source solver"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = ["numpy>=1.24"]
@@ -16,12 +16,21 @@ classifiers = [
   "Topic :: Scientific/Engineering :: Physics",
 ]
 
+[project.scripts]
+wave-resistance = "wave_resistance.cli:main"
+
 [project.optional-dependencies]
+iterative = ["scipy>=1.10"]
 plot = ["matplotlib>=3.7"]
-test = ["pytest>=7", "mpmath>=1.3"]
+test = ["pytest>=7"]
+dev = ["scipy>=1.10", "matplotlib>=3.7", "pytest>=7"]
 
 [tool.setuptools]
 package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = ["tests"]

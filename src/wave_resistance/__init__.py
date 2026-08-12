@@ -1,52 +1,39 @@
-"""Michell thin-ship wave-resistance model."""
+"""Wave resistance of displacement monohulls by linear potential flow."""
 
 from .geometry import (
-    GeometryDiagnostics,
-    HullGeometryWarning,
-    HullMetadata,
-    OffsetHull,
+    HullHydrostatics,
+    HullOffsets,
+    TriMesh,
+    image_inspired_yacht,
     wigley_hull,
 )
 from .models import (
-    BatchWaveResistanceResult,
+    CaseDiagnostics,
+    MeshSettings,
     SolverSettings,
-    SpectralDensity,
     WaterProperties,
     WaveResistanceResult,
 )
-from .solver import MichellOperator, MichellSolver
-from .validation import (
-    HullAttitude,
-    IncompatibleValidationData,
-    ResistanceQuantity,
-    ValidationMetrics,
-    ValidationReport,
-    ValidationSeries,
-    compare_series,
-    score_values,
-)
+from .kochin import kochin_wave_coefficient
+from .reference import wigley_michell_amplitude, wigley_michell_coefficient
+from .solver import LinearFreeSurfaceSolver
+from .wave_pattern import transverse_energy_flux_coefficient, wave_pattern_coefficient
 
 __all__ = [
-    "BatchWaveResistanceResult",
-    "GeometryDiagnostics",
-    "HullAttitude",
-    "HullGeometryWarning",
-    "HullMetadata",
-    "IncompatibleValidationData",
-    "MichellOperator",
-    "MichellSolver",
-    "OffsetHull",
-    "ResistanceQuantity",
+    "CaseDiagnostics",
+    "HullHydrostatics",
+    "HullOffsets",
+    "LinearFreeSurfaceSolver",
+    "MeshSettings",
     "SolverSettings",
-    "SpectralDensity",
-    "ValidationMetrics",
-    "ValidationReport",
-    "ValidationSeries",
+    "TriMesh",
     "WaterProperties",
     "WaveResistanceResult",
-    "compare_series",
-    "score_values",
+    "image_inspired_yacht",
+    "kochin_wave_coefficient",
+    "transverse_energy_flux_coefficient",
+    "wave_pattern_coefficient",
     "wigley_hull",
+    "wigley_michell_amplitude",
+    "wigley_michell_coefficient",
 ]
-
-__version__ = "0.1.0"
