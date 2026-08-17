@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Low-order Michell thin-ship wave-resistance model"
 readme = "README.md"
 requires-python = ">=3.9"
-dependencies = ["numpy>=1.24"]
+dependencies = ["numpy>=1.24", "scipy>=1.10"]
 authors = [{name = "Ignazio Maria Viola"}]
 classifiers = [
   "Programming Language :: Python :: 3",
