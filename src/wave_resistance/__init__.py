@@ -1,52 +1,28 @@
-"""Michell thin-ship wave-resistance model."""
+"""Wave resistance of symmetric displacement monohulls."""
 
-from .geometry import (
-    GeometryDiagnostics,
-    HullGeometryWarning,
-    HullMetadata,
-    OffsetHull,
-    wigley_hull,
-)
-from .models import (
-    BatchWaveResistanceResult,
-    SolverSettings,
-    SpectralDensity,
-    WaterProperties,
-    WaveResistanceResult,
-)
+from .geometry import GeometryDiagnostics, HullGeometryWarning, HullMetadata, OffsetHull, wigley_hull
+from .models import BatchWaveResistanceResult, SolverSettings, SpectralDensity, WaterProperties, WaveResistanceResult
 from .solver import MichellOperator, MichellSolver
 from .validation import (
-    HullAttitude,
-    IncompatibleValidationData,
-    ResistanceQuantity,
-    ValidationMetrics,
-    ValidationReport,
-    ValidationSeries,
-    compare_series,
-    score_values,
+    HullAttitude, IncompatibleValidationData, ResistanceQuantity, ValidationMetrics,
+    ValidationReport, ValidationSeries, compare_series, score_values,
 )
+from .potential_flow import (
+    BEMSettings, ConvergenceSettings, DoubleBodyPotentialFlowSolver,
+    FreeSurfaceSettings, GeometrySettings, LinearPotentialFlowSolver,
+    NonlinearSettings, PhysicsSettings, PotentialFlowResult,
+)
+from .nonlinear import NonlinearPotentialFlowSolver
 
 __all__ = [
-    "BatchWaveResistanceResult",
-    "GeometryDiagnostics",
-    "HullAttitude",
-    "HullGeometryWarning",
-    "HullMetadata",
-    "IncompatibleValidationData",
-    "MichellOperator",
-    "MichellSolver",
-    "OffsetHull",
-    "ResistanceQuantity",
-    "SolverSettings",
-    "SpectralDensity",
-    "ValidationMetrics",
-    "ValidationReport",
-    "ValidationSeries",
-    "WaterProperties",
-    "WaveResistanceResult",
-    "compare_series",
-    "score_values",
-    "wigley_hull",
+    "BEMSettings", "BatchWaveResistanceResult", "ConvergenceSettings",
+    "DoubleBodyPotentialFlowSolver", "FreeSurfaceSettings", "GeometryDiagnostics",
+    "GeometrySettings", "HullAttitude", "HullGeometryWarning", "HullMetadata",
+    "IncompatibleValidationData", "LinearPotentialFlowSolver", "MichellOperator",
+    "MichellSolver", "NonlinearPotentialFlowSolver", "NonlinearSettings", "OffsetHull",
+    "PhysicsSettings", "PotentialFlowResult", "ResistanceQuantity", "SolverSettings",
+    "SpectralDensity", "ValidationMetrics", "ValidationReport", "ValidationSeries",
+    "WaterProperties", "WaveResistanceResult", "compare_series", "score_values", "wigley_hull",
 ]
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
