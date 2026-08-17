@@ -2,21 +2,12 @@
 
 ## Scope and coordinates
 
-The existing `HullOffsets` API uses a right-handed body frame in which `x`
-increases from bow to stern with the incident stream, `y` is starboard, and
-`z` is upward. This convention predates the exact-body solver and is retained
-for API compatibility. Relative to the requested aft-to-forward,
-downward-positive convention, the transformation is
-
-\[
-x_d=-x,\qquad y_d=y,\qquad z_d=-z,
-\]
-
-and vectors are transformed by `diag(-1,1,-1)`. All implementation equations
-below use the public upward-positive frame. The incident velocity is
-\(U\boldsymbol e_x\); the positive resistance magnitude is the force on the
-body in `+x`. The total potential is
-\(\Phi=Ux+\phi\).
+The existing `OffsetHull` convention is retained exactly: `x` increases from
+aft to forward, `y` is starboard, and `z` is positive downward from the calm
+waterplane. The body-fixed incident stream is \(-U\boldsymbol e_x\). The ship's
+positive advance direction is `+x`, and positive resistance is the magnitude
+of the hydrodynamic force in `-x`. The total potential is
+\(\Phi=-Ux+\phi\).
 
 SI units are used. Reference scales are \(L\), \(U\), \(\rho U^2\), and
 \(\rho U^2L^2\), with \(Fn=U/\sqrt{gL}\). The principal coefficient uses the
@@ -39,11 +30,10 @@ triangles with the free-space Rankine Green function,
 \]
 
 With normals directed from the body into the fluid, the fluid-side normal
-trace contains the `-1/2` source-sheet jump. Hull rows
-enforce \(\nabla\Phi\cdot\boldsymbol n=0\). The double-body system includes a
-zero-integrated-source compatibility constraint. Potential has an arbitrary
-additive gauge; reported panel potential is the single-layer evaluation from
-the flux-constrained source solution.
+trace contains the `-1/2` source-sheet jump. Hull rows enforce
+\(\nabla\Phi\cdot\boldsymbol n=0\). Source flux is reported as a compatibility
+diagnostic. Potential has an arbitrary additive gauge; only its gradient
+affects pressure.
 
 Panel integrals are not centroid sources. Duffy quadrature split about the
 orthogonal projection treats self and near-singular interactions; the same
@@ -68,19 +58,19 @@ are
 \[
  \Phi_z-\Phi_x\eta_x-\Phi_y\eta_y=0,
  \qquad
- \tfrac12(|\nabla\Phi|^2-U^2)+g\eta=0.
+ \tfrac12(|\nabla\Phi|^2-U^2)-g\eta=0.
 \]
 
 Linearisation about `z=0` gives
 
 \[
- U\eta_x-\phi_z=0,
- \qquad U\phi_x+g\eta=0,
+ U\eta_x+\phi_z=0,
+ \qquad -U\phi_x-g\eta=0,
 \]
 
 and elimination of elevation gives
-\(U^2\phi_{xx}/g+\phi_z=0\). The linear solver couples this row to hull
-impermeability. A four-point backward streamwise derivative supplies the
+\(-U^2\phi_{xx}/g+\phi_z=0\). The linear solver couples this row to hull
+impermeability. A four-point forward-in-`x` upwind derivative supplies the
 no-incoming/upwind condition. Quadratic downstream and lateral sponge terms
 damp the truncated boundary.
 
@@ -98,7 +88,7 @@ Hull pressure and force are
 \[
 p=\tfrac12\rho(U^2-|\nabla\Phi|^2),\qquad
 \boldsymbol F=-\int_{S_H}p\boldsymbol n\,dS,
-\qquad R_p=F_x.
+\qquad R_p=-F_x.
 \]
 
 The independent far-field diagnostic is the linear wave-energy flux through a
@@ -116,7 +106,7 @@ kinematic, homotopy-dynamic, exact-dynamic, update, waterline, geometry, and
 slope quantities. Mesh and domain gates are marked passed only when the caller
 does not require those studies, or when a study wrapper supplies evidence.
 
-Non-finite geometry, a non-manifold mesh, downward graph normals (loss of the
+Non-finite geometry, a non-manifold mesh, non-positive downward graph normals (loss of the
 single-valued assumption), excessive slope, singular/incompatible systems,
 continuation divergence, and failed force balance produce explicit failure
 reasons and `accepted=False`.

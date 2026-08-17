@@ -1,8 +1,8 @@
 """Dense exact-body Rankine-panel reference solvers.
 
 The classes in this module are intentionally separate from the established
-linear screening API. Coordinates follow :class:`HullOffsets`: incident flow
-in ``+x`` and ``z`` positive upward.
+Michell API. Coordinates follow :class:`OffsetHull`: ``x`` is aft-to-forward,
+``z`` is positive downward, and the body-fixed incident stream is in ``-x``.
 """
 
 from __future__ import annotations
@@ -144,7 +144,10 @@ class PotentialFlowResult:
             "resistance_pressure_N", "resistance_far_field_N", "coefficient_pressure",
             "coefficient_far_field", "force_balance_discrepancy_N", "failure_reasons",
         )
-        data = {name: getattr(self, name) for name in scalar_names}
+        data = {}
+        for name in scalar_names:
+            value = getattr(self, name)
+            data[name] = None if isinstance(value, float) and not math.isfinite(value) else value
         data["status"] = asdict(self.status)
         data["metadata"] = self.metadata
         data["linear_residual_history"] = self.linear_residual_history
@@ -171,7 +174,9 @@ class PotentialFlowResult:
 
 
 def _speed(hull, physics):
-    return physics.froude_number * math.sqrt(physics.water.gravity_m_s2 * hull.length_ref_m)
+    return physics.froude_number * math.sqrt(
+        physics.water.g_m_s2 * hull.metadata.length_ref_m
+    )
 
 
 def _dense_solve(matrix, rhs):
@@ -192,12 +197,12 @@ def _dense_solve(matrix, rhs):
 def _sponge(points, hull, settings):
     x = points[:, 0]
     y = np.abs(points[:, 1])
-    length = float(hull.length_ref_m)
-    downstream_start = hull.x_m[-1] + (1.0 - settings.sponge_fraction) * settings.downstream_lengths * length
-    x_end = hull.x_m[-1] + settings.downstream_lengths * length
+    length = float(hull.metadata.length_ref_m)
+    downstream_start = hull.x_m[0] - (1.0 - settings.sponge_fraction) * settings.downstream_lengths * length
+    x_end = hull.x_m[0] - settings.downstream_lengths * length
     lateral_start = (1.0 - settings.sponge_fraction) * settings.lateral_lengths * length
     y_end = settings.lateral_lengths * length
-    sx = np.clip((x - downstream_start) / max(x_end - downstream_start, 1.0e-12), 0.0, 1.0) ** 2
+    sx = np.clip((downstream_start - x) / max(downstream_start - x_end, 1.0e-12), 0.0, 1.0) ** 2
     sy = np.clip((y - lateral_start) / max(y_end - lateral_start, 1.0e-12), 0.0, 1.0) ** 2
     return np.maximum(sx, sy)
 
@@ -208,16 +213,16 @@ def _linear_fs_operator(points, source_mesh, speed, gravity, length, bem, free_s
     blocks = []
     for offset in range(4):
         shifted = points.copy()
-        shifted[:, 0] -= offset * h
+        shifted[:, 0] += offset * h
         blocks.append(potential_influence(shifted, source_mesh, bem.quadrature_order))
     dxx = (2.0 * blocks[0] - 5.0 * blocks[1] + 4.0 * blocks[2] - blocks[3]) / h**2
     normals = np.tile((0.0, 0.0, 1.0), (len(points), 1))
     dz = normal_influence(points, normals, source_mesh, bem.quadrature_order)
-    return speed**2 / gravity * dxx + dz, blocks[0]
+    return -speed**2 / gravity * dxx + dz, blocks[0]
 
 
 def _vertex_elevation(fs_mesh, hull_mesh, hull_sigma, fs_sigma, speed, gravity, bem):
-    length = float(fs_mesh.physical_geometry.length_ref_m)
+    length = float(fs_mesh.physical_geometry.metadata.length_ref_m)
     h = max(bem.derivative_step_fraction * math.sqrt(float(np.median(fs_mesh.areas))), 1.0e-5 * length)
     plus, minus = fs_mesh.vertices.copy(), fs_mesh.vertices.copy()
     plus[:, 0] += h
@@ -235,12 +240,12 @@ def _vertex_elevation(fs_mesh, hull_mesh, hull_sigma, fs_sigma, speed, gravity, 
 def _far_field_from_mesh(fs_mesh, eta, speed, water):
     xmax = np.max(fs_mesh.vertices[:, 0])
     x_values = np.unique(fs_mesh.vertices[:, 0])
-    cut_x = x_values[-2] if len(x_values) > 1 else xmax
+    cut_x = x_values[1] if len(x_values) > 1 else xmax
     ids = np.flatnonzero(np.isclose(fs_mesh.vertices[:, 0], cut_x))
     order = np.argsort(fs_mesh.vertices[ids, 1])
     ids = ids[order]
     y, elevation = fs_mesh.vertices[ids, 1], eta[ids]
-    power = downstream_energy_flux(y, elevation, speed, water.density_kg_m3, water.gravity_m_s2)
+    power = downstream_energy_flux(y, elevation, speed, water.rho_kg_m3, water.g_m_s2)
     resistance = power / speed if speed > 0.0 else 0.0
     return resistance, {"x": np.full_like(y, cut_x), "y": y, "elevation": elevation}
 
@@ -253,8 +258,8 @@ class DoubleBodyPotentialFlowSolver:
         self.convergence = convergence or ConvergenceSettings()
 
     def _validate(self):
-        if not hasattr(self.hull, "half_breadth_m"):
-            raise UnsupportedPotentialFlow("only HullOffsets geometries are released")
+        if not hasattr(self.hull, "half_breadth_m") or not hasattr(self.hull, "metadata"):
+            raise UnsupportedPotentialFlow("only OffsetHull geometries are released")
         if np.any(self.hull.half_breadth_m < 0.0):
             raise UnsupportedPotentialFlow("asymmetric or invalid offsets are unsupported")
 
@@ -263,19 +268,17 @@ class DoubleBodyPotentialFlowSolver:
         mesh = offset_hull_mesh(self.hull)
         speed = _speed(self.hull, self.physics)
         single_layer, normal_derivative = assemble_source_operators(mesh, self.bem.quadrature_order)
-        rhs = -speed * mesh.normals[:, 0]
+        rhs = speed * mesh.normals[:, 0]
         sigma, residual, condition, _ = _dense_solve(normal_derivative, rhs)
         potential = single_layer @ sigma
         disturbance_gradient = reconstruct_surface_gradient(mesh, potential)
-        total_velocity = disturbance_gradient + np.array([speed, 0.0, 0.0])
+        total_velocity = disturbance_gradient + np.array([-speed, 0.0, 0.0])
         total_velocity -= np.sum(total_velocity * mesh.normals, axis=1)[:, None] * mesh.normals
         water = self.physics.water
-        pressure = 0.5 * water.density_kg_m3 * (speed**2 - np.sum(total_velocity**2, axis=1))
-        # In the public convention the incident stream and drag on the body
-        # both point in +x, so the positive resistance magnitude is F_x.
-        resistance = float(pressure_force(mesh, pressure)[0])
-        reference_area = self.hull.hydrostatics.wetted_area_m2
-        denominator = 0.5 * water.density_kg_m3 * speed**2 * reference_area
+        pressure = 0.5 * water.rho_kg_m3 * (speed**2 - np.sum(total_velocity**2, axis=1))
+        resistance = float(-pressure_force(mesh, pressure)[0])
+        reference_area = self.hull.wetted_area_m2
+        denominator = 0.5 * water.rho_kg_m3 * speed**2 * reference_area
         coefficient = resistance / denominator
         algebraic = residual <= self.bem.algebraic_tolerance and condition <= self.bem.condition_limit
         force_ok = abs(coefficient) <= self.convergence.force_relative_tolerance
@@ -310,18 +313,18 @@ class LinearPotentialFlowSolver(DoubleBodyPotentialFlowSolver):
         _, hull_hull = assemble_source_operators(hull_mesh, self.bem.quadrature_order)
         hull_fs = normal_influence(hull_mesh.centroids, hull_mesh.normals, fs_mesh, self.bem.quadrature_order)
         fs_hull, fs_hull_potential = _linear_fs_operator(
-            fs_mesh.centroids, hull_mesh, speed, self.physics.water.gravity_m_s2,
-            self.hull.length_ref_m, self.bem, self.free_surface,
+            fs_mesh.centroids, hull_mesh, speed, self.physics.water.g_m_s2,
+            self.hull.metadata.length_ref_m, self.bem, self.free_surface,
         )
         fs_fs, fs_fs_potential = _linear_fs_operator(
-            fs_mesh.centroids, fs_mesh, speed, self.physics.water.gravity_m_s2,
-            self.hull.length_ref_m, self.bem, self.free_surface,
+            fs_mesh.centroids, fs_mesh, speed, self.physics.water.g_m_s2,
+            self.hull.metadata.length_ref_m, self.bem, self.free_surface,
         )
         np.fill_diagonal(fs_fs, np.diag(fs_fs) - 0.5)
         sponge = _sponge(fs_mesh.centroids, self.hull, self.free_surface)
-        fs_fs += self.free_surface.sponge_strength * sponge[:, None] * fs_fs_potential / self.hull.length_ref_m
+        fs_fs += self.free_surface.sponge_strength * sponge[:, None] * fs_fs_potential / self.hull.metadata.length_ref_m
         matrix = np.block([[hull_hull, hull_fs], [fs_hull, fs_fs]])
-        rhs = np.r_[-speed * hull_mesh.normals[:, 0], np.zeros(len(fs_mesh.faces))]
+        rhs = np.r_[speed * hull_mesh.normals[:, 0], np.zeros(len(fs_mesh.faces))]
         strengths, residual, condition, backend = _dense_solve(matrix, rhs)
         return hull_mesh, strengths[:len(hull_mesh.faces)], strengths[len(hull_mesh.faces):], residual, condition, backend
 
@@ -336,16 +339,16 @@ class LinearPotentialFlowSolver(DoubleBodyPotentialFlowSolver):
         speed = _speed(self.hull, self.physics)
         potential = potential_influence(hull_mesh.centroids, hull_mesh, self.bem.quadrature_order) @ hull_sigma
         potential += potential_influence(hull_mesh.centroids, fs_mesh, self.bem.quadrature_order) @ fs_sigma
-        velocity = reconstruct_surface_gradient(hull_mesh, potential) + np.array([speed, 0.0, 0.0])
+        velocity = reconstruct_surface_gradient(hull_mesh, potential) + np.array([-speed, 0.0, 0.0])
         velocity -= np.sum(velocity * hull_mesh.normals, axis=1)[:, None] * hull_mesh.normals
         water = self.physics.water
-        pressure = 0.5 * water.density_kg_m3 * (speed**2 - np.sum(velocity**2, axis=1))
-        resistance = float(pressure_force(hull_mesh, pressure)[0])
-        eta = _vertex_elevation(fs_mesh, hull_mesh, hull_sigma, fs_sigma, speed, water.gravity_m_s2, self.bem)
+        pressure = 0.5 * water.rho_kg_m3 * (speed**2 - np.sum(velocity**2, axis=1))
+        resistance = float(-pressure_force(hull_mesh, pressure)[0])
+        eta = _vertex_elevation(fs_mesh, hull_mesh, hull_sigma, fs_sigma, speed, water.g_m_s2, self.bem)
         far, wave_cut = _far_field_from_mesh(fs_mesh, eta, speed, water)
         balance = mixed_force_balance(resistance, far, self.convergence.force_relative_tolerance, self.convergence.absolute_force_tolerance)
-        reference_area = self.hull.hydrostatics.wetted_area_m2
-        denominator = 0.5 * water.density_kg_m3 * speed**2 * reference_area
+        reference_area = self.hull.wetted_area_m2
+        denominator = 0.5 * water.rho_kg_m3 * speed**2 * reference_area
         algebraic = residual <= self.bem.algebraic_tolerance and condition <= self.bem.condition_limit
         mesh_ok = not self.convergence.require_mesh_study
         domain_ok = not self.convergence.require_domain_study

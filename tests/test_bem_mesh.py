@@ -14,7 +14,7 @@ def test_offset_adapter_and_free_surface():
  assert len(body.faces)>0 and np.all(body.areas>0); assert np.allclose(fs.vertices[:,2],0)
  assert body.diagnostics()["minimum_angle_deg"]>0
  # Every analytic waterline station is represented on both sides.
- for x,b in zip(h.x_m,h.waterline_half_breadth_m):
+ for x,b in zip(h.x_m,h.half_breadth_m[:,0]):
   assert np.any(np.all(np.isclose(fs.vertices,[x,b,0.],atol=1e-12),axis=1))
   assert np.any(np.all(np.isclose(fs.vertices,[x,-b,0.],atol=1e-12),axis=1))
 

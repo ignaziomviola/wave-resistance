@@ -8,8 +8,8 @@ def test_downward_positive_linear_signs_and_dispersion():
     k = gravity / speed**2
     x = np.linspace(0.0, 3.0, 20)
     eta = np.cos(k * x)
-    phi_x = gravity * eta / speed
-    phi_z = speed * (-k * np.sin(k * x))
+    phi_x = -gravity * eta / speed
+    phi_z = -speed * (-k * np.sin(k * x))
     kin, dyn = linear_residual(
         np.c_[np.zeros_like(x), np.zeros_like(x), phi_z], eta,
         phi_x, -k * np.sin(k * x), speed, gravity,

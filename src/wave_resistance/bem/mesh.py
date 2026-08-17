@@ -1,4 +1,4 @@
-"""Triangular surface meshes and the :class:`HullOffsets` adapter."""
+"""Triangular surface meshes and the :class:`OffsetHull` adapter."""
 
 from __future__ import annotations
 
@@ -162,7 +162,9 @@ def rectangular_free_surface(hull, nx=17, ny=13, upstream=1.0, downstream=2.0, l
         raise ValueError("free-surface nx>=5 and odd ny>=5 are required")
     length = float(hull.metadata.length_ref_m)
     x0, x1 = float(hull.x_m[0]), float(hull.x_m[-1])
-    external = np.linspace(x0 - upstream * length, x1 + downstream * length, nx)
+    # With x aft-to-forward the body-fixed incident stream is in -x:
+    # downstream is aft of x0 and upstream is forward of x1.
+    external = np.linspace(x0 - downstream * length, x1 + upstream * length, nx)
     xs = np.unique(np.r_[external, hull.x_m])
     half_count = (ny + 1) // 2
     vertices = []

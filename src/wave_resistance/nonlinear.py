@@ -68,7 +68,7 @@ class NonlinearPotentialFlowSolver(LinearPotentialFlowSolver):
         )
         fs_fs += np.diag(damping)
         matrix = np.block([[hull_hull, hull_fs], [fs_hull, fs_fs]])
-        rhs = -speed * np.r_[hull_mesh.normals[:, 0], fs_mesh.normals[:, 0]]
+        rhs = speed * np.r_[hull_mesh.normals[:, 0], fs_mesh.normals[:, 0]]
         strengths, residual, condition, backend = _dense_solve(matrix, rhs)
         nh = len(hull_mesh.faces)
         return strengths[:nh], strengths[nh:], residual, condition, backend
@@ -85,8 +85,11 @@ class NonlinearPotentialFlowSolver(LinearPotentialFlowSolver):
         eta = eta_linear.copy()
         fixed = np.zeros(len(fs_mesh.vertices), dtype=bool)
         fixed[np.unique(fs_mesh.boundary_edges)] = True
-        length = float(self.hull.length_ref_m)
-        waterline_y = self.hull.half_breadth_at_waterline(fs_mesh.vertices[:, 0])
+        length = float(self.hull.metadata.length_ref_m)
+        waterline_y = np.interp(
+            fs_mesh.vertices[:, 0], self.hull.x_m, self.hull.half_breadth_m[:, 0],
+            left=0.0, right=0.0,
+        )
         fixed |= (
             (fs_mesh.vertices[:, 0] >= self.hull.x_m[0] - 1.0e-10 * length)
             & (fs_mesh.vertices[:, 0] <= self.hull.x_m[-1] + 1.0e-10 * length)
@@ -99,7 +102,7 @@ class NonlinearPotentialFlowSolver(LinearPotentialFlowSolver):
         last_algebraic = np.inf
         last_condition = np.inf
         speed = _speed(self.hull, self.physics)
-        gravity = self.physics.water.gravity_m_s2
+        gravity = self.physics.water.g_m_s2
 
         for lam in np.linspace(0.0, 1.0, self.nonlinear.homotopy_steps + 1)[1:]:
             step_converged = False
@@ -118,9 +121,9 @@ class NonlinearPotentialFlowSolver(LinearPotentialFlowSolver):
                 hull_phi += potential_influence(hull_mesh.centroids, moved, self.bem.quadrature_order) @ fs_sigma
                 fs_phi = potential_influence(moved.centroids, hull_mesh, self.bem.quadrature_order) @ hull_sigma
                 fs_phi += potential_influence(moved.centroids, moved, self.bem.quadrature_order) @ fs_sigma
-                hull_velocity = reconstruct_surface_gradient(hull_mesh, hull_phi) + np.array([speed, 0.0, 0.0])
+                hull_velocity = reconstruct_surface_gradient(hull_mesh, hull_phi) + np.array([-speed, 0.0, 0.0])
                 hull_velocity -= np.sum(hull_velocity * hull_mesh.normals, axis=1)[:, None] * hull_mesh.normals
-                fs_velocity = reconstruct_surface_gradient(moved, fs_phi) + np.array([speed, 0.0, 0.0])
+                fs_velocity = reconstruct_surface_gradient(moved, fs_phi) + np.array([-speed, 0.0, 0.0])
                 fs_velocity -= np.sum(fs_velocity * moved.normals, axis=1)[:, None] * moved.normals
 
                 panel_eta = moved.centroids[:, 2]
@@ -128,15 +131,15 @@ class NonlinearPotentialFlowSolver(LinearPotentialFlowSolver):
                     converged = False
                     history.append({"lambda": float(lam), "iteration": iteration, "failure": "loss of single-valued graph"})
                     break
-                # For a graph with upward normal n proportional to
+                # For a graph with downward normal n proportional to
                 # (-eta_x,-eta_y,1), these are the exact planar-panel slopes.
                 eta_x_panel = -moved.normals[:, 0] / moved.normals[:, 2]
                 eta_y_panel = -moved.normals[:, 1] / moved.normals[:, 2]
-                disturbance = fs_velocity - np.array([speed, 0.0, 0.0])
+                disturbance = fs_velocity - np.array([-speed, 0.0, 0.0])
                 kin, dyn = nonlinear_residual(
                     disturbance, panel_eta, eta_x_panel, eta_y_panel, speed, gravity
                 )
-                exact_target_panel = panel_eta - dyn / gravity
+                exact_target_panel = panel_eta + dyn / gravity
                 exact_target = _panel_to_vertex(moved, exact_target_panel)
                 target = (1.0 - lam) * eta_linear + lam * exact_target
                 target[fixed] = 0.0
@@ -188,11 +191,11 @@ class NonlinearPotentialFlowSolver(LinearPotentialFlowSolver):
 
         hull_phi = potential_influence(hull_mesh.centroids, hull_mesh, self.bem.quadrature_order) @ hull_sigma
         hull_phi += potential_influence(hull_mesh.centroids, final_mesh, self.bem.quadrature_order) @ fs_sigma
-        hull_velocity = reconstruct_surface_gradient(hull_mesh, hull_phi) + np.array([speed, 0.0, 0.0])
+        hull_velocity = reconstruct_surface_gradient(hull_mesh, hull_phi) + np.array([-speed, 0.0, 0.0])
         hull_velocity -= np.sum(hull_velocity * hull_mesh.normals, axis=1)[:, None] * hull_mesh.normals
         water = self.physics.water
-        pressure = 0.5 * water.density_kg_m3 * (speed**2 - np.sum(hull_velocity**2, axis=1))
-        resistance = float(pressure_force(hull_mesh, pressure)[0])
+        pressure = 0.5 * water.rho_kg_m3 * (speed**2 - np.sum(hull_velocity**2, axis=1))
+        resistance = float(-pressure_force(hull_mesh, pressure)[0])
         far, wave_cut = _far_field_from_mesh(final_mesh, eta, speed, water)
         balance = mixed_force_balance(
             resistance, far, self.convergence.force_relative_tolerance,
@@ -202,7 +205,7 @@ class NonlinearPotentialFlowSolver(LinearPotentialFlowSolver):
         mesh_ok = not self.convergence.require_mesh_study
         domain_ok = not self.convergence.require_domain_study
         accepted = algebraic and converged and balance and mesh_ok and domain_ok
-        denominator = 0.5 * water.density_kg_m3 * speed**2 * self.hull.hydrostatics.wetted_area_m2
+        denominator = 0.5 * water.rho_kg_m3 * speed**2 * self.hull.wetted_area_m2
         reasons = []
         if not algebraic:
             reasons.append("nonlinear BEM system failed residual/condition limits")
@@ -213,8 +216,14 @@ class NonlinearPotentialFlowSolver(LinearPotentialFlowSolver):
         linear.method_name = "nonlinear-exact-body-rankine-fixed-waterline"
         linear.resistance_pressure_N = resistance
         linear.resistance_far_field_N = far
-        linear.coefficient_pressure = resistance / denominator
-        linear.coefficient_far_field = far / denominator
+        # Preserve raw forces for diagnosis, but do not expose plausible-looking
+        # coefficients after nonlinear or independent force-balance failure.
+        if converged and balance:
+            linear.coefficient_pressure = resistance / denominator
+            linear.coefficient_far_field = far / denominator
+        else:
+            linear.coefficient_pressure = float("nan")
+            linear.coefficient_far_field = float("nan")
         linear.force_balance_discrepancy_N = abs(resistance - far)
         linear.potential = hull_phi
         linear.surface_velocity = hull_velocity

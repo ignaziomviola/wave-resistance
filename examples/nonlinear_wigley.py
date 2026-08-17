@@ -14,7 +14,7 @@ from wave_resistance import (
 
 output = Path("nonlinear_wigley_output")
 output.mkdir(exist_ok=True)
-hull = wigley_hull(length_m=1.0, beam_m=0.10, draft_m=0.0625, nx=4, nz=3)
+hull = wigley_hull(length_m=1.0, beam_m=0.10, draft_m=0.0625, nx=5, nz=3)
 bem = BEMSettings(quadrature_order=4)
 geometry = GeometrySettings(free_surface_nx=5, free_surface_ny=5)
 
