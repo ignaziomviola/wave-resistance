@@ -360,8 +360,29 @@ def wigley_hull(
     length_ref_m: float = 1.0,
     beam_to_length: float = 0.10,
     draft_to_length: float = 0.0625,
+    *,
+    nx: Optional[int] = None,
+    nz: Optional[int] = None,
+    length_m: Optional[float] = None,
+    beam_m: Optional[float] = None,
+    draft_m: Optional[float] = None,
 ) -> HullOffsets:
-    """Return the canonical parabolic Wigley hull."""
+    """Return the canonical parabolic Wigley hull.
+
+    ``nx``/``nz`` and dimensional aliases are accepted for the exact-body
+    examples while the original arguments remain unchanged.
+    """
+
+    if nx is not None:
+        station_count = nx
+    if nz is not None:
+        vertical_count = nz
+    if length_m is not None:
+        length_ref_m = length_m
+    if beam_m is not None:
+        beam_to_length = beam_m / length_ref_m
+    if draft_m is not None:
+        draft_to_length = draft_m / length_ref_m
 
     x_over_l = np.linspace(-0.5, 0.5, station_count)
     eta = np.linspace(0.0, 1.0, vertical_count)

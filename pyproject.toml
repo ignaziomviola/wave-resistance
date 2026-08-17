@@ -8,7 +8,7 @@ version = "0.2.0"
 description = "Research implementation of a 3-D linear free-surface Rankine-source solver"
 readme = "README.md"
 requires-python = ">=3.9"
-dependencies = ["numpy>=1.24"]
+dependencies = ["numpy>=1.24", "scipy>=1.10"]
 authors = [{name = "Ignazio Maria Viola"}]
 classifiers = [
   "Programming Language :: Python :: 3",
