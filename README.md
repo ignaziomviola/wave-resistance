@@ -282,3 +282,62 @@ The test suite covers analytic/reference kernels, geometry ingestion,
 configuration/result contracts and validation metrics. Numerical refinement
 should be judged together with the reported quadrature and tail diagnostics,
 not solely by agreement with an experimental curve.
+
+## Restricted exact-body panel solvers
+
+The legacy `MichellSolver` remains the fast thin-ship screening method. Three
+separate dense reference solvers are also available: `DoubleBodyPotentialFlowSolver`,
+`LinearPotentialFlowSolver`, and `NonlinearPotentialFlowSolver`. No method is
+silently substituted for another.
+
+```bash
+python examples/nonlinear_wigley.py
+```
+
+Nonlinear quick start:
+
+```python
+from wave_resistance import (
+    BEMSettings,
+    GeometrySettings,
+    NonlinearPotentialFlowSolver,
+    wigley_hull,
+)
+
+hull = wigley_hull(length_m=1.0, nx=7, nz=5)
+result = NonlinearPotentialFlowSolver(
+    hull,
+    geometry=GeometrySettings(free_surface_nx=13, free_surface_ny=9),
+    bem=BEMSettings(quadrature_order=8),
+).solve()
+
+print(result.status)
+print(result.failure_reasons)
+result.to_json("summary.json")
+result.to_npz("fields.npz")
+```
+
+The nonlinear workflow starts from the target-speed linear solution, moves the
+interior graph nodes, and advances a linear-to-exact homotopy. Its
+`fixed_waterline_nonlinear` mode is explicitly an approximate waterline
+treatment; it is not an exact moving-waterline method.
+
+The exact-body solvers support steady, inviscid, incompressible, irrotational,
+deep-water flow around smooth, symmetric displacement monohulls at fixed
+sinkage and trim. They report wave-making resistance only. Viscosity, total
+resistance, finite depth, appendages, propulsion, dynamic attitude, transoms,
+multihulls, asymmetric hulls, CAD import, surface tension, separation,
+ventilation, spray, overturning and breaking waves are excluded.
+
+`algebraic_converged`, `free_surface_converged`,
+`force_balance_converged`, `mesh_converged`, and `domain_converged` are
+independent. `accepted` is true only when every required gate passes. An
+invalid mesh, non-graph surface, excessive slope, incompatible system,
+continuation failure, or failed pressure/far-field balance produces an explicit
+failure reason and an unaccepted result.
+
+See [the nonlinear solver contract](docs/NONLINEAR_SOLVER_DESIGN.md),
+which defines signs, formulation, diagnostics, exclusions, and acceptance.
+The dense implementation is intended for verification-scale meshes. Inspect
+every convergence field and perform mesh and domain studies before interpreting
+a computed force.
