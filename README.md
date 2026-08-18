@@ -1,10 +1,10 @@
 # Wave resistance
 
-`wave-resistance` is a transparent low-order implementation of Michell's
-thin-ship theory for the steady wave-making resistance of a displacement
-vessel in deep, calm water. It accepts a tensor-product hull-offset surface,
-computes a resistance curve over Froude number, and reports numerical and
-validity diagnostics alongside every result.
+`wave-resistance` contains two deliberately separate model families.  The
+legacy `MichellSolver` is the fast thin-ship screening method.  The new dense
+Rankine-panel reference implementation works on the finite-breadth hull and
+provides double-body, exact-body linear-free-surface, and restricted nonlinear
+fixed-waterline solves.  Michell's method has not been replaced or changed.
 
 The package predicts the **wave-making component only**. It is not a total
 resistance or powering model: skin friction, viscous pressure drag,
@@ -48,6 +48,77 @@ Install plotting and test dependencies when needed:
 ```bash
 python -m pip install -e '.[plot,test]'
 ```
+
+The transparent dense reference path uses NumPy; plotting remains optional.
+
+## Exact-body Rankine-BEM quick start
+
+```python
+from wave_resistance import (
+    DoubleBodyPotentialFlowSolver,
+    LinearPotentialFlowSolver,
+    NonlinearPotentialFlowSolver,
+    wigley_hull,
+)
+
+hull = wigley_hull(length_m=1.0, nx=41, nz=17)
+double_body = DoubleBodyPotentialFlowSolver().solve(hull, 0.30)
+linear = LinearPotentialFlowSolver().solve(hull, 0.30)
+nonlinear = NonlinearPotentialFlowSolver().solve(hull, 0.30)
+
+print(nonlinear.accepted, nonlinear.failure_reasons)
+nonlinear.to_json("summary.json")
+nonlinear.to_npz("fields.npz")
+```
+
+The dense implementation is intended for verification and modest meshes.
+Read [`docs/NONLINEAR_SOLVER_DESIGN.md`](docs/NONLINEAR_SOLVER_DESIGN.md)
+before interpreting a result.  It fixes coordinates, signs, the indirect
+single-layer formulation, free-surface equations, radiation treatment, force
+definitions, and acceptance rules.
+
+The three public solvers are:
+
+- `DoubleBodyPotentialFlowSolver`: the finite-breadth hull mirrored in the
+  calm plane, useful for kernel, flux, pressure, and d'Alembert checks;
+- `LinearPotentialFlowSolver`: coupled perturbation potential and elevation on
+  an explicitly meshed, damped finite free surface;
+- `NonlinearPotentialFlowSolver`: exact kinematic and Bernoulli residuals on a
+  moving graph, using target-speed linear initialisation and homotopy.  Release
+  1 is explicitly `fixed_waterline_nonlinear`; it is not an exact moving-
+  waterline method.
+
+Every `PotentialFlowResult` separates `algebraic_converged`,
+`free_surface_converged`, `force_balance_converged`, `mesh_converged`, and
+`domain_converged`.  `accepted` is their conjunction.  Pressure and outer
+momentum-flux resistance must agree within the mixed tolerance (2% by default,
+with an absolute near-zero floor).  An unaccepted result has NaN resistance
+coefficients; fatal nonlinear or geometry failure also suppresses forces.
+Inspect `failure_reasons` and all residual histories.
+
+The present dense discretisation passes its double-body reference gate.  The
+checked-in coarse linear/nonlinear Wigley smoke case does **not** yet meet the
+2% pressure/momentum-flux balance, and is therefore correctly unaccepted.
+This remaining numerical limitation is visible rather than hidden; finer
+mesh/domain convergence must be demonstrated before treating this code as a
+validated nonlinear resistance predictor.
+
+Run the reproducible workflow with:
+
+```bash
+python examples/nonlinear_wigley.py --quick --output nonlinear_wigley_output
+```
+
+It exports compact JSON summaries, compressed NPZ fields, convergence CSV,
+and (when Matplotlib is installed) wave-elevation and convergence plots.
+
+Supported physics is steady, inviscid, incompressible, irrotational flow in
+deep calm water; fixed attitude; a smooth symmetric displacement monohull from
+`OffsetHull`; a single-valued free-surface graph; and wave-making resistance
+only.  Unsupported—and rejected rather than extrapolated—are viscous or total
+resistance, appendages and propulsion, finite depth, free sinkage/trim,
+transoms, separation, spray, breaking/overturning waves, ventilation, surface
+tension, multihulls/asymmetry, and CAD/STL/OBJ import.
 
 ## Quick start
 

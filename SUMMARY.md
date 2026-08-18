@@ -2,11 +2,12 @@
 
 ## Purpose and status
 
-This repository provides a reusable, parameter-free Python implementation of
-Michell's thin-ship theory for the steady deep-water wave-making resistance of
-slender, pointed displacement monohulls. Version `0.1.0` is implemented,
-packaged, tested and numerically verified. Experimental or CFD validation for a
-specific vessel remains future work and will not be used to calibrate the model.
+This repository provides the verified Michell thin-ship implementation and a
+new restricted dense Rankine-panel reference path for finite-breadth hulls.
+The latter includes double-body, linear free-surface, and fixed-waterline
+nonlinear solvers.  It is not yet release-qualified: the coarse Wigley linear
+and nonlinear cases fail the independent 2% force-balance gate and return no
+accepted coefficient.  This limitation is explicit and is not calibrated away.
 
 The model predicts radiated wave resistance only. It is not a total-resistance
 or powering method.
@@ -95,10 +96,16 @@ certify the tail before `lambda=1e4` or 4096 cycles returns
 
 ## Verification evidence
 
-The test suite currently contains 58 passing tests. It covers analytic cell
+The test suite currently contains 70 passing tests. The legacy tests cover analytic cell
 moments, direct/offset agreement, malformed geometry, transom and flat-bottom
 rejection, positivity, zero hull, translation, reversal and scale invariance,
 oscillatory alias detection, refinement and validation metrics.
+
+The Rankine-panel tests additionally cover orientation and topology, exact
+source-panel velocity and jump terms, self and far potential limits, a
+potential-gradient check, waterline conformity, discrete plane-wave
+dispersion, sponge placement, invalid graph rejection, double-body zero drag
+and flux, result exports, and explicit linear/nonlinear failure gates.
 
 The included Wigley benchmark uses `L/B=10`, `B/T=1.6`, 81 stations, 33 depth
 levels, and 71 Froude numbers from 0.10 to 0.45. All 71 points converged. Against
