@@ -15,6 +15,18 @@ from .models import (
     WaveResistanceResult,
 )
 from .solver import MichellOperator, MichellSolver
+from .potential_flow import (
+    BEMSettings,
+    ConvergenceSettings,
+    DoubleBodyPotentialFlowSolver,
+    FreeSurfaceSettings,
+    GeometrySettings,
+    LinearPotentialFlowSolver,
+    NonlinearSettings,
+    PhysicsSettings,
+    PotentialFlowResult,
+)
+from .nonlinear import NonlinearPotentialFlowSolver
 from .validation import (
     HullAttitude,
     IncompatibleValidationData,
@@ -28,14 +40,24 @@ from .validation import (
 
 __all__ = [
     "BatchWaveResistanceResult",
+    "BEMSettings",
+    "ConvergenceSettings",
+    "DoubleBodyPotentialFlowSolver",
     "GeometryDiagnostics",
+    "GeometrySettings",
     "HullAttitude",
     "HullGeometryWarning",
     "HullMetadata",
     "IncompatibleValidationData",
     "MichellOperator",
     "MichellSolver",
+    "FreeSurfaceSettings",
+    "LinearPotentialFlowSolver",
+    "NonlinearPotentialFlowSolver",
+    "NonlinearSettings",
     "OffsetHull",
+    "PhysicsSettings",
+    "PotentialFlowResult",
     "ResistanceQuantity",
     "SolverSettings",
     "SpectralDensity",
