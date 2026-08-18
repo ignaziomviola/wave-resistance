@@ -90,15 +90,18 @@ The three public solvers are:
 
 Every `PotentialFlowResult` separates `algebraic_converged`,
 `free_surface_converged`, `force_balance_converged`, `mesh_converged`, and
-`domain_converged`.  `accepted` is their conjunction.  Pressure and outer
-momentum-flux resistance must agree within the mixed tolerance (2% by default,
-with an absolute near-zero floor).  An unaccepted result has NaN resistance
+`domain_converged`.  `accepted` is their conjunction.  A verified independent
+far-field resistance is not yet implemented, so the field is NaN and the
+force-balance gate cannot pass.  The previous experimental rectangular-box
+flux is not used because its surface intersects the source sheet and lacks the
+gravity/free-surface closure terms.  An unaccepted result has NaN resistance
 coefficients; fatal nonlinear or geometry failure also suppresses forces.
 Inspect `failure_reasons` and all residual histories.
 
 The present dense discretisation passes its double-body reference gate.  The
 checked-in coarse linear/nonlinear Wigley smoke case does **not** yet meet the
-2% pressure/momentum-flux balance, and is therefore correctly unaccepted.
+free-surface convergence and independent-force gates, and is therefore
+correctly unaccepted.
 This remaining numerical limitation is visible rather than hidden; finer
 mesh/domain convergence must be demonstrated before treating this code as a
 validated nonlinear resistance predictor.

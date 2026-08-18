@@ -10,6 +10,20 @@ import numpy as np
 from ..geometry import OffsetHull
 
 
+def _graded_coordinates(start: float, stop: float, count: int, *,
+                        start_refinement: float=1.,
+                        stop_refinement: float=1.) -> np.ndarray:
+    """Monotone endpoint-graded coordinates; factors of one are uniform."""
+    if start_refinement < 1 or stop_refinement < 1:
+        raise ValueError("endpoint refinement factors must be at least one")
+    t=np.linspace(0.,1.,count)
+    left=t**float(start_refinement)
+    right=(1-t)**float(stop_refinement)
+    mapped=np.divide(left,left+right,out=np.zeros_like(left),where=(left+right)>0)
+    mapped[-1]=1.
+    return start+(stop-start)*mapped
+
+
 @dataclass(frozen=True)
 class MeshDiagnostics:
     minimum_area: float
@@ -113,13 +127,15 @@ class SurfaceMesh:
         cosines[:, 1] = (lengths[:, 0]**2 + lengths[:, 1]**2 - lengths[:, 2]**2)/(2*lengths[:, 0]*lengths[:, 1])
         cosines[:, 2] = (lengths[:, 1]**2 + lengths[:, 2]**2 - lengths[:, 0]**2)/(2*lengths[:, 1]*lengths[:, 2])
         minimum_angle = float(np.min(np.degrees(np.arccos(np.clip(cosines, -1, 1)))))
-        owners: Dict[Tuple[int, int], int] = {}
+        owners: Dict[Tuple[int, int], list] = {}
         for face in self.faces:
             for edge in ((face[0], face[1]), (face[1], face[2]), (face[2], face[0])):
                 key = tuple(sorted(map(int, edge)))
-                owners[key] = owners.get(key, 0) + 1
-        boundary = sum(v == 1 for v in owners.values())
-        non_manifold = sum(v > 2 for v in owners.values())
+                owners.setdefault(key,[]).append(tuple(map(int,edge)))
+        boundary = sum(len(v) == 1 for v in owners.values())
+        non_manifold = sum(len(v) > 2 for v in owners.values())
+        orientation=all(len(edges)!=2 or edges[0]==edges[1][::-1]
+                        for edges in owners.values())
         wl_error = 0.0
         if waterline_reference is not None and len(self.waterline_vertices):
             a = self.vertices[self.waterline_vertices]
@@ -128,11 +144,18 @@ class SurfaceMesh:
         messages = []
         if non_manifold:
             messages.append("non-manifold edges")
+        if not orientation:
+            messages.append("inconsistent face orientation across a shared edge")
         if minimum_angle < 5.0:
             messages.append("minimum panel angle below 5 degrees")
+        scale=max(float(np.ptp(self.vertices,axis=0).max()),1.)
+        waterline_valid=waterline_reference is None or wl_error<=1e-10*scale
+        if not waterline_valid:
+            messages.append("waterline does not conform to the hull mesh")
+        valid=non_manifold==0 and orientation and waterline_valid
         return MeshDiagnostics(float(np.min(self.areas)), float(np.max(aspect)), minimum_angle,
-                               boundary, non_manifold, 0, non_manifold == 0,
-                               wl_error, non_manifold == 0, tuple(messages))
+                               boundary, non_manifold, 0, orientation,
+                               wl_error, valid, tuple(messages))
 
     def with_vertices(self, vertices: np.ndarray, *, name: Optional[str] = None) -> "SurfaceMesh":
         return SurfaceMesh(vertices, self.faces, self.tags, name or self.name,
@@ -173,15 +196,21 @@ def _deduplicated_mesh(points: Iterable[Sequence[float]], raw_faces: Iterable[Se
 
 
 def offset_hull_mesh(hull: OffsetHull, nx: Optional[int] = None,
-                     nz: Optional[int] = None) -> SurfaceMesh:
+                     nz: Optional[int] = None, *, bow_refinement: float=1.,
+                     stern_refinement: float=1.,
+                     waterline_refinement: float=1.) -> SurfaceMesh:
     """Triangulate both sides of an offset hull with outward orientation."""
     if not isinstance(hull, OffsetHull):
         raise TypeError("hull must be an OffsetHull")
     nx = nx or len(hull.x); nz = nz or len(hull.z)
     if nx < 3 or nz < 2:
         raise ValueError("hull mesh requires nx>=3 and nz>=2")
-    x = np.linspace(0, hull.metadata.length_ref_m, nx)
-    z = np.linspace(0, hull.draft_m, nz)
+    # x runs aft-to-forward: the stern is the start and bow is the stop.
+    x = _graded_coordinates(0,hull.metadata.length_ref_m,nx,
+                            start_refinement=stern_refinement,
+                            stop_refinement=bow_refinement)
+    z = _graded_coordinates(0,hull.draft_m,nz,
+                            start_refinement=waterline_refinement)
     by_z = np.array([np.interp(x, hull.x, hull.half_breadths[:, j]) for j in range(len(hull.z))]).T
     breadth = np.array([np.interp(z, hull.z, row) for row in by_z])
     points=[]; faces=[]; tags=[]; waterline=[]
@@ -206,14 +235,23 @@ def offset_hull_mesh(hull: OffsetHull, nx: Optional[int] = None,
 def free_surface_mesh(hull: OffsetHull, *, nx: int = 17, ny_half: int = 6,
                       upstream_lengths: float = 0.5, downstream_lengths: float = 1.5,
                       lateral_lengths: float = 0.75,
-                      hull_nx: Optional[int] = None) -> SurfaceMesh:
+                      hull_nx: Optional[int] = None,
+                      bow_refinement: float=1.,
+                      stern_refinement: float=1.) -> SurfaceMesh:
     """Build a graph mesh whose inner edge exactly matches the hull waterline."""
     if nx < 5 or ny_half < 2:
         raise ValueError("free-surface mesh requires nx>=5 and ny_half>=2")
     length=hull.metadata.length_ref_m
-    hull_x=np.linspace(0,length,hull_nx or min(len(hull.x),nx))
-    x=np.unique(np.concatenate((np.linspace(-upstream_lengths*length,
-                                             (1+downstream_lengths)*length, nx), hull_x)))
+    hull_x=_graded_coordinates(0,length,hull_nx or min(len(hull.x),nx),
+                               start_refinement=stern_refinement,
+                               stop_refinement=bow_refinement)
+    domain_x=np.linspace(-upstream_lengths*length,
+                         (1+downstream_lengths)*length,nx)
+    # Inside the hull length, use exactly the hull stations.  Retaining
+    # unrelated domain-grid stations there would introduce unmatched nodes on
+    # the shared waterline.
+    outside=domain_x[(domain_x<0)|(domain_x>length)]
+    x=np.unique(np.concatenate((outside,hull_x)))
     inner=np.interp(np.clip(x,0,length), hull.x, hull.half_breadths[:,0])
     inner[(x<0)|(x>length)]=0.0
     outer=lateral_lengths*length
@@ -229,7 +267,8 @@ def free_surface_mesh(hull: OffsetHull, *, nx: int = 17, ny_half: int = 6,
             for j in range(ny_half-1):
                 a=base+i*ny_half+j; b=a+ny_half; c=b+1; d=a+1
                 # Fluid is below (+z), hence the normal into air is -z.
-                faces.extend(((a,c,b),(a,d,c))); tags.extend(("free_surface","free_surface"))
+                cells=((a,b,c),(a,c,d)) if side < 0 else ((a,c,b),(a,d,c))
+                faces.extend(cells); tags.extend(("free_surface","free_surface"))
     return _deduplicated_mesh(points,faces,tags,name="free_surface",
                               waterline_raw=waterline,physical_geometry=hull)
 

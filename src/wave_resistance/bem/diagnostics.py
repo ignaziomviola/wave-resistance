@@ -8,6 +8,7 @@ from .mesh import SurfaceMesh
 @dataclass
 class ResidualHistory:
     bem: List[float]=field(default_factory=list)
+    matrix_condition: List[float]=field(default_factory=list)
     hull_impermeability: List[float]=field(default_factory=list)
     free_surface_kinematic: List[float]=field(default_factory=list)
     free_surface_dynamic: List[float]=field(default_factory=list)

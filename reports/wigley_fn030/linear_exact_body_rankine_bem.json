@@ -1,0 +1,22 @@
+{
+  "method_name": "linear-exact-body-rankine-bem",
+  "formulation_version": "rankine-source-v1",
+  "froude_number": 0.3,
+  "speed_m_s": 0.9394671362000907,
+  "pressure_resistance_N": 0.00032610547830049354,
+  "far_field_resistance_N": 0.16607627483756485,
+  "c_pressure": NaN,
+  "c_far_field": NaN,
+  "force_balance_discrepancy_N": 0.16575016935926434,
+  "actual_wetted_area_m2": 0.1428167396082866,
+  "reference_wetted_area_m2": 0.14882424907957031,
+  "algebraic_converged": true,
+  "free_surface_converged": true,
+  "force_balance_converged": false,
+  "mesh_converged": true,
+  "domain_converged": true,
+  "accepted": false,
+  "failure_reasons": [
+    "independent force balance failed"
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "geometry": "standard Wigley hull, L/B=10, L/T=16",
+  "froude_number": 0.313,
+  "experimental_cw_mean": 0.0017,
+  "experimental_cw_min": 0.0014,
+  "experimental_cw_max": 0.0019,
+  "theoretical_cw_mean": 0.00172,
+  "secondary_source": {
+    "title": "Hydrodynamic Modelling of Hulls Using RANSE Codes",
+    "url": "https://www.diva-portal.org/smash/get/diva2%3A1236507/FULLTEXT01.pdf",
+    "note": "Reports the mean and range from Chen and Noblesse (1983), Figure 22. Only this numerical summary is reproduced."
+  },
+  "primary_source": {
+    "authors": "C. Y. Chen and F. Noblesse",
+    "title": "Comparison Between Theoretical Predictions of Wave Resistance and Experimental Data for the Wigley Hull",
+    "journal": "Journal of Ship Research 27(4), 215-226 (1983)",
+    "doi": "10.5957/jsr.1983.27.4.215"
+  },
+  "michell_solver_cw": 0.0019118562056175288,
+  "michell_solver_resistance_N": 0.14009806770976704
+}

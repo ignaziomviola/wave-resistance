@@ -3,7 +3,9 @@ import numpy as np
 from wave_resistance import wigley_hull
 from wave_resistance.bem.diagnostics import validate_graph
 from wave_resistance.bem.free_surface import (least_squares_derivative,
-                                               move_graph, sponge_strength)
+                                               boundary_vertices, move_graph,
+                                               project_panel_elevation,
+                                               sponge_strength)
 from wave_resistance.bem.mesh import free_surface_mesh
 
 class FreeSurfaceDiscretisationTests(unittest.TestCase):
@@ -29,5 +31,15 @@ class FreeSurfaceDiscretisationTests(unittest.TestCase):
         moved=move_graph(mesh,np.linspace(-1,1,len(mesh.faces)),mesh.waterline_vertices)
         valid,reasons,_=validate_graph(moved,.05)
         self.assertFalse(valid); self.assertIn("slope",reasons[0])
+
+    def test_panel_projection_fixes_graph_boundaries_exactly(self):
+        hull=wigley_hull(nx=11,nz=5); mesh=free_surface_mesh(hull,nx=5,ny_half=3,hull_nx=3)
+        fixed=boundary_vertices(mesh)
+        values=.01*np.sin(mesh.centroids[:,0])
+        projected=project_panel_elevation(mesh,values,fixed)
+        self.assertTrue(np.all(projected[fixed]==0.))
+        vertices=np.array(mesh.vertices,copy=True); vertices[:,2]=projected
+        moved=mesh.with_vertices(vertices)
+        self.assertTrue(np.all(np.isfinite(moved.centroids[:,2])))
 
 if __name__=="__main__": unittest.main()

@@ -1,0 +1,20 @@
+{
+  "method_name": "double-body-rankine-bem",
+  "formulation_version": "rankine-source-v1",
+  "froude_number": 0.3,
+  "speed_m_s": 0.9394671362000907,
+  "pressure_resistance_N": -1.7737547541862853e-16,
+  "far_field_resistance_N": 0.0,
+  "c_pressure": -2.6348919937251016e-18,
+  "c_far_field": 0.0,
+  "force_balance_discrepancy_N": 1.7737547541862853e-16,
+  "actual_wetted_area_m2": 0.1428167396082866,
+  "reference_wetted_area_m2": 0.14882424907957031,
+  "algebraic_converged": true,
+  "free_surface_converged": true,
+  "force_balance_converged": true,
+  "mesh_converged": true,
+  "domain_converged": true,
+  "accepted": true,
+  "failure_reasons": []
+}

@@ -15,8 +15,7 @@ from .bem.free_surface import least_squares_derivative, move_graph, sponge_stren
 from .bem.linear_solvers import solve_dense
 from .bem.mesh import (SurfaceMesh, combine_meshes, free_surface_mesh,
                        mirrored_double_body, offset_hull_mesh)
-from .bem.resistance import (force_balance, momentum_flux_resistance,
-                             pressure_resistance)
+from .bem.resistance import force_balance, pressure_resistance
 
 FORMULATION_VERSION="rankine-source-v1"
 
@@ -32,6 +31,8 @@ class GeometrySettings:
     def __post_init__(self):
         if self.hull_nx<3 or self.hull_nz<2: raise ValueError("hull_nx>=3 and hull_nz>=2 required")
         if self.free_surface_nx<5 or self.free_surface_ny_half<2: raise ValueError("invalid free-surface resolution")
+        if min(self.bow_refinement,self.stern_refinement,self.waterline_refinement)<1:
+            raise ValueError("mesh refinement factors must be at least one")
 
 @dataclass(frozen=True)
 class PhysicsSettings:
@@ -48,6 +49,10 @@ class BEMSettings:
     linear_tolerance: float=1e-8
     far_field_ratio: float=4.0
     condition_limit: float=1e13
+    def __post_init__(self):
+        if self.linear_tolerance<=0: raise ValueError("linear_tolerance must be positive")
+        if self.far_field_ratio<=0: raise ValueError("far_field_ratio must be positive")
+        if self.condition_limit<=0: raise ValueError("condition_limit must be positive")
 
 @dataclass(frozen=True)
 class FreeSurfaceSettings:
@@ -138,26 +143,43 @@ class _BaseSolver:
         if not math.isfinite(fn) or fn<=0: raise ValueError("Froude number must be finite and positive")
         if np.any(hull.half_breadths[1:-1,0]<=0): raise ValueError("invalid or disconnected waterline")
     def _meshes(self,hull):
-        h=offset_hull_mesh(hull,self.geometry.hull_nx,self.geometry.hull_nz)
+        h=offset_hull_mesh(hull,self.geometry.hull_nx,self.geometry.hull_nz,
+            bow_refinement=self.geometry.bow_refinement,
+            stern_refinement=self.geometry.stern_refinement,
+            waterline_refinement=self.geometry.waterline_refinement)
         f=free_surface_mesh(hull,nx=self.geometry.free_surface_nx,ny_half=self.geometry.free_surface_ny_half,
             upstream_lengths=self.free_surface.upstream_lengths,downstream_lengths=self.free_surface.downstream_lengths,
-            lateral_lengths=self.free_surface.lateral_lengths,hull_nx=self.geometry.hull_nx)
+            lateral_lengths=self.free_surface.lateral_lengths,hull_nx=self.geometry.hull_nx,
+            bow_refinement=self.geometry.bow_refinement,
+            stern_refinement=self.geometry.stern_refinement)
         return h,f
     def _empty_fs(self): return np.empty((0,3)),np.empty((0,3),int),np.empty(0)
     def _result(self,hull,fn,hmesh,velocity,pressure,potential,strengths,history,*,
                 fmesh=None,eta=None,algebraic=True,fs_converged=True,far=None,reasons=()):
         speed=fn*math.sqrt(self.physics.water.g_m_s2*hull.metadata.length_ref_m)
         rp=float(np.sum(pressure*hmesh.normals[:,0]*hmesh.areas)) if len(pressure) else float("nan")
-        combined=hmesh if fmesh is None else combine_meshes(hmesh,fmesh)
         all_strengths=strengths
-        rf=momentum_flux_resistance(combined,all_strengths,self.physics.water.rho_kg_m3,speed,
-                                    depth=hull.metadata.length_ref_m) if far is None and np.all(np.isfinite(strengths)) else far
+        # No far-field value is fabricated from the truncated Rankine-source
+        # sheet.  The previous rectangular control box intersected that sheet
+        # and omitted the gravity/free-surface momentum terms, so it was not an
+        # independent conservation balance.  ``None`` therefore means that a
+        # verified estimator is unavailable, not zero resistance.
+        rf=float("nan") if far is None else float(far)
         discrepancy,force_ok=force_balance(rp,rf,self.convergence.force_relative_tolerance,
                                             self.convergence.absolute_force_tolerance_N)
         reasons=tuple(reasons)
         if not force_ok and "independent force balance failed" not in reasons:
             reasons=reasons+("independent force balance failed",)
-        mesh_diag=hmesh.diagnostics(); mesh_ok=mesh_diag.valid
+        mesh_diag=hmesh.diagnostics(); mesh_metadata={"hull":asdict(mesh_diag)}
+        mesh_ok=mesh_diag.valid
+        if fmesh is not None:
+            free_diag=fmesh.diagnostics(
+                waterline_reference=hmesh.vertices[hmesh.waterline_vertices])
+            graph_ok,graph_reasons,_=validate_graph(fmesh,self.nonlinear.max_slope)
+            mesh_metadata["free_surface"]=asdict(free_diag)
+            mesh_ok=mesh_ok and free_diag.valid and graph_ok
+            if not mesh_ok and "invalid free-surface mesh" not in reasons:
+                reasons=reasons+("invalid free-surface mesh",)+tuple(graph_reasons)
         mesh_converged=mesh_ok and not self.convergence.require_mesh_study
         domain_converged=not self.convergence.require_domain_study
         fatal=any(reason!="independent force balance failed" for reason in reasons)
@@ -169,27 +191,46 @@ class _BaseSolver:
         else: fv,ff,fe=fmesh.vertices,fmesh.faces,(eta if eta is not None else fmesh.centroids[:,2])
         wave_cuts={}
         if fmesh is not None:
-            ytol=max(hull.beam_m,1e-8); mask=np.abs(fmesh.centroids[:,1])<ytol
-            wave_cuts={"centreline_x_m":fmesh.centroids[mask,0],"centreline_eta_m":np.asarray(fe)[mask]}
+            centroids=fmesh.centroids; elevations=np.asarray(fe)
+            # A coarse symmetric half-domain mesh need not place a face
+            # centroid on y=0.  At each face-centroid x location, average the
+            # innermost port/starboard pair to obtain a deterministic
+            # centreline-limit wave cut.
+            rounded_x=np.round(centroids[:,0],12)
+            cut_x=[]; cut_eta=[]
+            for coordinate in np.unique(rounded_x):
+                candidates=np.flatnonzero(rounded_x==coordinate)
+                minimum=np.min(np.abs(centroids[candidates,1]))
+                selected=candidates[np.isclose(np.abs(centroids[candidates,1]),minimum,
+                                                rtol=0.,atol=1e-12)]
+                cut_x.append(float(np.mean(centroids[selected,0])))
+                cut_eta.append(float(np.mean(elevations[selected])))
+            wave_cuts={"centreline_x_m":np.asarray(cut_x),
+                       "centreline_eta_m":np.asarray(cut_eta)}
         return PotentialFlowResult(self.method_name,FORMULATION_VERSION,float(fn),speed,rp,rf,
             rp/denom if accepted and np.isfinite(rp) else float("nan"),rf/denom if accepted and np.isfinite(rf) else float("nan"),discrepancy,
             potential,velocity,pressure,fv,ff,np.asarray(fe),hmesh.vertices,hmesh.faces,float(np.sum(hmesh.areas)),ref,
-            history.as_dict(),{"hull":asdict(mesh_diag)},asdict(self.free_surface),wave_cuts,
+            history.as_dict(),mesh_metadata,asdict(self.free_surface),wave_cuts,
             algebraic,fs_converged,force_ok,mesh_converged,domain_converged,accepted,tuple(reasons),all_strengths)
 
 class DoubleBodyPotentialFlowSolver(_BaseSolver):
     method_name="double-body-rankine-bem"
     def solve(self,hull:OffsetHull,froude_number:float)->PotentialFlowResult:
-        self._validate(hull,froude_number); hmesh=offset_hull_mesh(hull,self.geometry.hull_nx,self.geometry.hull_nz)
+        self._validate(hull,froude_number); hmesh=offset_hull_mesh(hull,self.geometry.hull_nx,self.geometry.hull_nz,
+            bow_refinement=self.geometry.bow_refinement,
+            stern_refinement=self.geometry.stern_refinement,
+            waterline_refinement=self.geometry.waterline_refinement)
         closed,nphysical=mirrored_double_body(hmesh); speed=froude_number*math.sqrt(self.physics.water.g_m_s2*hull.metadata.length_ref_m)
         uniform=np.array((-speed,0.,0.)); matrix=collocation_normal_matrix(closed,far_field_ratio=self.bem.far_field_ratio)
         rhs=-(closed.normals@uniform); flux=float(np.dot(rhs,closed.areas)); rhs-=flux/np.sum(closed.areas)
-        solved=solve_dense(matrix,rhs,rtol=self.bem.linear_tolerance); sigma=solved.solution
+        solved=solve_dense(matrix,rhs,rtol=self.bem.linear_tolerance,
+                           allowed_nullity=1,
+                           condition_limit=self.bem.condition_limit); sigma=solved.solution
         perturb=evaluate_velocity(closed,sigma,closed.centroids[:nphysical],far_field_ratio=self.bem.far_field_ratio)
         velocity=perturb+uniform; potential_matrix,_=influence_matrices(closed,closed.centroids[:nphysical],closed.normals[:nphysical],far_field_ratio=self.bem.far_field_ratio)
         potential=-speed*closed.centroids[:nphysical,0]+potential_matrix@sigma
         rp,pressure=pressure_resistance(hmesh,velocity,self.physics.water.rho_kg_m3,speed)
-        hist=ResidualHistory(); hist.bem.extend(solved.residual_history); hist.hull_impermeability.append(float(np.max(np.abs(np.sum(velocity*hmesh.normals,axis=1)))/speed)); hist.waterline.append(0.)
+        hist=ResidualHistory(); hist.bem.extend(solved.residual_history); hist.matrix_condition.append(solved.condition_number); hist.hull_impermeability.append(float(np.max(np.abs(np.sum(velocity*hmesh.normals,axis=1)))/speed)); hist.waterline.append(0.)
         # D'Alembert provides the independent double-body force check.
         return self._result(hull,froude_number,hmesh,velocity,pressure,potential,sigma[:nphysical],hist,
                             far=0.,algebraic=solved.converged,reasons=(() if solved.converged else ("singular or incompatible BEM system",)))
@@ -205,12 +246,16 @@ class LinearPotentialFlowSolver(_BaseSolver):
           fraction=self.free_surface.sponge_fraction,maximum=self.free_surface.sponge_strength)
         a=np.zeros((nh+2*nf,nh+nf+nf)); b=np.zeros(nh+2*nf)
         uniform=np.array((-speed,0.,0.)); a[:nh,:nh+nf]=h[:nh]; b[:nh]=-(hmesh.normals@uniform)
-        a[nh:nh+nf,:nh+nf]=h[nh:]; a[nh:nh+nf,nh+nf:]=speed*dx
+        # With z positive down and the free-surface normal pointing into air,
+        # n.grad(phi)=-phi_z.  Linear kinematics gives phi_z=-U*eta_x,
+        # hence n.grad(phi)-U*eta_x=0.
+        a[nh:nh+nf,:nh+nf]=h[nh:]; a[nh:nh+nf,nh+nf:]=-speed*dx
         a[nh+nf:,:nh+nf]=(speed/g)*dx@s[nh:]; a[nh+nf:,nh+nf:]=np.eye(nf)+np.diag(sponge)
-        solved=solve_dense(a,b,rtol=self.bem.linear_tolerance); sigma=solved.solution[:nh+nf]; eta=solved.solution[nh+nf:]
+        solved=solve_dense(a,b,rtol=self.bem.linear_tolerance,
+                           condition_limit=self.bem.condition_limit); sigma=solved.solution[:nh+nf]; eta=solved.solution[nh+nf:]
         perturb=evaluate_velocity(combined,sigma,hmesh.centroids,far_field_ratio=self.bem.far_field_ratio); velocity=perturb+uniform
         potential=-speed*hmesh.centroids[:,0]+s[:nh]@sigma; rp,pressure=pressure_resistance(hmesh,velocity,self.physics.water.rho_kg_m3,speed)
-        hist=ResidualHistory(); hist.bem.extend(solved.residual_history); hist.hull_impermeability.append(float(np.max(np.abs(np.sum(velocity*hmesh.normals,axis=1)))/speed)); hist.free_surface_kinematic.append(float(np.linalg.norm(h[nh:]@sigma+speed*dx@eta)/max(speed,1e-12))); hist.free_surface_dynamic.append(float(np.linalg.norm(eta+(speed/g)*dx@(s[nh:]@sigma))/max(np.linalg.norm(eta),1e-12))); hist.waterline.append(0.)
+        hist=ResidualHistory(); hist.bem.extend(solved.residual_history); hist.matrix_condition.append(solved.condition_number); hist.hull_impermeability.append(float(np.max(np.abs(np.sum(velocity*hmesh.normals,axis=1)))/speed)); hist.free_surface_kinematic.append(float(np.linalg.norm(h[nh:]@sigma-speed*dx@eta)/(max(speed,1e-12)*np.sqrt(nf)))); hist.free_surface_dynamic.append(float(np.linalg.norm(eta+(speed/g)*dx@(s[nh:]@sigma)+sponge*eta)/(max(np.linalg.norm(eta),1e-12)))); hist.waterline.append(0.)
         moved=move_graph(fmesh,eta,fmesh.waterline_vertices)
         reasons=() if solved.converged else ("singular or incompatible BEM system",)
         return self._result(hull,froude_number,hmesh,velocity,pressure,potential,sigma,hist,fmesh=moved,eta=eta,algebraic=solved.converged,fs_converged=solved.converged,reasons=reasons)

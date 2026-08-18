@@ -1,0 +1,23 @@
+{
+  "method_name": "nonlinear-exact-body-rankine-bem-fixed-waterline",
+  "formulation_version": "rankine-source-v1",
+  "froude_number": 0.313,
+  "speed_m_s": 0.9801773787687613,
+  "pressure_resistance_N": NaN,
+  "far_field_resistance_N": NaN,
+  "c_pressure": NaN,
+  "c_far_field": NaN,
+  "force_balance_discrepancy_N": NaN,
+  "actual_wetted_area_m2": 0.1475441926975072,
+  "reference_wetted_area_m2": 0.14879903741181702,
+  "algebraic_converged": true,
+  "free_surface_converged": false,
+  "force_balance_converged": false,
+  "mesh_converged": true,
+  "domain_converged": true,
+  "accepted": false,
+  "failure_reasons": [
+    "free-surface slope exceeds the mesh-resolution limit",
+    "independent force balance failed"
+  ]
+}

@@ -1,4 +1,4 @@
-"""Pressure and solved-source far-field resistance estimates."""
+"""Pressure resistance and experimental far-field diagnostics."""
 from __future__ import annotations
 import math
 import numpy as np
@@ -31,6 +31,8 @@ def kochin_resistance(mesh: SurfaceMesh, strengths: np.ndarray, rho: float,
 
 def force_balance(pressure: float, far_field: float, relative_tolerance: float,
                   absolute_tolerance: float):
+    if not np.isfinite(pressure) or not np.isfinite(far_field):
+        return float("nan"),False
     discrepancy=abs(pressure-far_field)
     tolerance=max(relative_tolerance*max(abs(pressure),abs(far_field)),absolute_tolerance)
     return discrepancy,discrepancy<=tolerance
@@ -38,10 +40,12 @@ def force_balance(pressure: float, far_field: float, relative_tolerance: float,
 def momentum_flux_resistance(mesh: SurfaceMesh, strengths: np.ndarray, rho: float,
                              speed: float, *, order: int=6,
                              depth: float=None) -> float:
-    """Independent outer-control-box momentum-flux estimate.
+    """Experimental outer-control-box momentum-flux estimate.
 
-    Upstream, downstream, lateral, bottom, and the just-submerged top face are
-    integrated; the uniform-stream tensor is subtracted analytically pointwise.
+    This diagnostic is not suitable as a force-convergence gate: the flat top
+    intersects the Rankine source sheet and the expression omits the gravity
+    and deformed-free-surface terms required for a closed momentum balance.
+    It is retained only for reproducibility of earlier development reports.
     """
     vertices=mesh.vertices; xmin,xmax=np.min(vertices[:,0]),np.max(vertices[:,0])
     ymax=float(np.max(np.abs(vertices[:,1]))); length=max(xmax-xmin,1e-12)

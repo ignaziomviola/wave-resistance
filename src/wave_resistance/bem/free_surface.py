@@ -3,6 +3,41 @@ from __future__ import annotations
 import numpy as np
 from .mesh import SurfaceMesh
 
+
+def boundary_vertices(mesh: SurfaceMesh) -> np.ndarray:
+    """Return vertices on the exterior boundary of a triangular surface."""
+    owners = {}
+    for face in mesh.faces:
+        for a,b in ((face[0],face[1]),(face[1],face[2]),(face[2],face[0])):
+            edge=tuple(sorted((int(a),int(b))))
+            owners[edge]=owners.get(edge,0)+1
+    return np.unique([vertex for edge,count in owners.items() if count==1
+                      for vertex in edge]).astype(int)
+
+
+def project_panel_elevation(mesh: SurfaceMesh, panel_elevation: np.ndarray,
+                            fixed_vertices: np.ndarray) -> np.ndarray:
+    """Least-squares project face-centred elevations onto graph vertices.
+
+    The returned vector is the vertex elevation.  Fixed vertices are imposed
+    exactly, so the design waterline and outer truncation boundary cannot
+    drift during nonlinear iteration.
+    """
+    values=np.asarray(panel_elevation,float)
+    if values.shape!=(len(mesh.faces),):
+        raise ValueError("panel_elevation must contain one value per face")
+    fixed=np.unique(np.asarray(fixed_vertices,int))
+    if np.any(fixed<0) or np.any(fixed>=len(mesh.vertices)):
+        raise ValueError("fixed vertex index is outside the mesh")
+    interpolation=np.zeros((len(mesh.faces),len(mesh.vertices)))
+    rows=np.arange(len(mesh.faces))[:,None]
+    interpolation[rows,mesh.faces]=1/3
+    free=np.setdiff1d(np.arange(len(mesh.vertices)),fixed)
+    result=np.zeros(len(mesh.vertices))
+    if len(free):
+        result[free]=np.linalg.lstsq(interpolation[:,free],values,rcond=None)[0]
+    return result
+
 def least_squares_derivative(points: np.ndarray, *, axis: int=0, neighbours: int=8,
                              upwind: bool=True) -> np.ndarray:
     points=np.asarray(points,float); n=len(points); d=np.zeros((n,n))
@@ -31,10 +66,6 @@ def sponge_strength(points: np.ndarray, length: float, *, upstream: float,
 
 def move_graph(mesh: SurfaceMesh, panel_elevation: np.ndarray,
                fixed_vertices: np.ndarray) -> SurfaceMesh:
-    values=np.asarray(panel_elevation,float); accum=np.zeros(len(mesh.vertices)); count=np.zeros(len(mesh.vertices))
-    for value,face in zip(values,mesh.faces):
-        accum[face]+=value; count[face]+=1
-    vertex_eta=np.divide(accum,count,out=np.zeros_like(accum),where=count>0)
-    vertex_eta[np.asarray(fixed_vertices,dtype=int)]=0.0
+    vertex_eta=project_panel_elevation(mesh,panel_elevation,fixed_vertices)
     vertices=np.array(mesh.vertices,copy=True); vertices[:,2]=vertex_eta
     return mesh.with_vertices(vertices,name="nonlinear_free_surface")

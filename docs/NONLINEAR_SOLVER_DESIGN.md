@@ -6,14 +6,14 @@ This document fixes the contract for formulation version `rankine-source-v1`.
 The public coordinates follow the offset convention: (x) is aft-to-forward,
 (y) is starboard, and (z) is positive down from the calm waterplane.  A
 ship advancing in (+x) at speed (U) is stationary in a uniform stream
-(oldsymbol U_\infty=(-U,0,0)).  The total potential is
+(\boldsymbol U_\infty=(-U,0,0)).  The total potential is
 
 \[
  \Phi=-Ux+\phi,\qquad \boldsymbol v=\nabla\Phi .
 \]
 
 Pressure force on the body is
-(oldsymbol F=-\int_{S_H}p\boldsymbol n\,dS), where the hull normal points
+(\boldsymbol F=-\int_{S_H}p\boldsymbol n\,dS), where the hull normal points
 from the body into the fluid.  Positive resistance opposes ship motion:
 (R=-F_x=\int_{S_H}p n_x\,dS).  SI units are used.  Reported coefficients use
 (C_W=R/(\rho U^2S_0/2)), with the legacy metadata wetted area (S_0); the
@@ -28,8 +28,9 @@ formulation,
  \phi(P)=\int_S {\sigma(Q)\over4\pi|P-Q|}\,dS_Q .
 \]
 
-The exterior, fluid-side normal derivative supplies the usual (-\sigma/2)
-jump.  The same single-layer representation is used on every boundary; source,
+The hull fluid-side limit supplies the (-\sigma/2) jump because fluid is on
+the positive-normal side.  The upper free-surface mesh points into air, so its
+fluid-side limit supplies (+\sigma/2).  The same single-layer representation is used on every boundary; source,
 dipole, and direct-potential equations are not mixed.  Exact polygon edge and
 solid-angle expressions are used for panel velocity.  Potential self terms use
 a Duffy transformation; adjacent and near terms use adaptive triangular
@@ -48,10 +49,11 @@ lower, (z\geq0), wetted half.
 The free surface is a conforming triangular graph (z=\eta(x,y)).  Its inner
 edge shares the offset-hull waterline.  The finite patch extends upstream,
 downstream, and laterally in multiples of hull length.  Hull and free-surface
-impermeability are imposed through the source equation.  The outer patch uses
-zero incident disturbance upstream and smoothly increasing downstream/lateral
-Rayleigh damping.  Streamwise derivatives use an upwind weighted least-squares
-operator.  Domain and mesh convergence are separate acceptance conditions.
+impermeability are imposed through the source equation.  Streamwise
+derivatives use an upwind least-squares operator; an algebraic sponge damps the
+downstream and lateral outer patch.  This is a provisional radiation treatment
+and must pass domain-extension tests before a case can be accepted.  Domain
+and mesh convergence are separate acceptance conditions.
 
 On the calm plane, the coupled linear conditions are
 
@@ -70,19 +72,22 @@ On the exact graph the steady conditions are
  \qquad {1\over2}|\nabla\Phi|^2-g\eta={1\over2}U^2.
 \]
 
-Nonlinear continuation blends the corresponding linear and exact residuals
-with (0\leq\lambda\leq1), beginning from the target-speed linear solution.
-The graph is moved and redistributed after every accepted update.  Release 1
+Nonlinear continuation blends the linear and exact Bernoulli elevation targets
+with (0\leq\lambda\leq1), beginning from the target-speed linear solution;
+kinematic impermeability is imposed on every current graph.  Face targets are
+projected to vertex elevations with the waterline and outer boundary fixed,
+and excessive-slope updates are backtracked.  Release 1
 offers the explicitly named `fixed_waterline_nonlinear` mode: waterline nodes
 remain at the design intersection.  It is an approximation, not an
 exact-moving-waterline method.
 
 ## Radiation, pressure, and force balance
 
-The upstream disturbance is pinned to zero.  First-order upwinding and cosine
-sponges occupy configurable downstream and lateral fractions.  Refining and
-extending this patch must reduce the reported upstream contamination and
-domain-change measures.
+No incoming wave is selected approximately by upwind streamwise derivatives;
+quadratic algebraic sponges occupy configurable downstream and lateral
+fractions.  Refining and extending this patch must reduce upstream
+contamination and domain-change measures.  The current implementation has not
+yet passed this release gate.
 
 Bernoulli pressure on the actual wetted panels is
 
@@ -90,10 +95,13 @@ Bernoulli pressure on the actual wetted panels is
  p={\rho\over2}\left(U^2-|\boldsymbol v|^2\right),
 \]
 
-with hydrostatic pressure excluded from wave resistance.  A second estimate
-is obtained from the solved source distribution through its deep-water Kochin
-spectrum; it never reuses the legacy prescribed Michell source
-(-n_x).  Acceptance requires
+with hydrostatic pressure excluded from wave resistance.  A verified
+solved-field Kochin or closed momentum/energy-flux estimate is still required.
+The earlier rectangular control-box diagnostic intersects the truncated
+source sheet and omits gravity/free-surface closure terms; it is retained only
+as an experimental function and is not used by the public solvers.  Until a
+verified independent estimate exists, (R_f=\mathrm{NaN}) and force balance
+cannot pass.  Once available, acceptance requires
 
 \[
  |R_p-R_f|\leq\max(\epsilon_r\max(|R_p|,|R_f|),\epsilon_a).
