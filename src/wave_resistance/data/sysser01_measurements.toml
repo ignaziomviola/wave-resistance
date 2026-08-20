@@ -1,0 +1,51 @@
+# Towing-tank measurements for DSYHS Sysser 01, bare hull upright, model scale.
+#
+# PROVENANCE.  Transcribed from the block headed "Bare hull upright" on the sheet "Sys 1" of
+# DSYHS_all_measurements_modelscale.xlsx, from
+#   https://doi.org/10.4121/21501402  (4TU.ResearchData, CC0, Jasper den Ouden, 2022-11-17)
+# downloaded as https://ndownloader.figshare.com/files/38098659.
+#
+# WATER PROPERTIES.  The workbook records the tank temperature, 17.3 C, but leaves its rho
+# and nu cells at zero, so both are computed rather than read: rho = 998.72 kg/m^3 from the
+# standard fifth-order fit for fresh water and nu = 1.0749e-6 m^2/s from
+# nu = 1.7688e-6/(1 + 0.03368 T + 0.00021 T^2).  This is an assumption about which formulas
+# the original reduction used, and it moves the friction by well under a per cent.
+#
+# RESIDUARY RESISTANCE is *not* in the release; it follows from Rt by subtracting an ITTC-57
+# friction line at k = 0, which is what the series' own reduction does.  It therefore
+# contains wave resistance together with nonlinear and viscous-form contributions, and is a
+# proxy for the wave resistance rather than a measurement of it.  At Fn = 0.10 the subtraction
+# gives -0.008 N, i.e. negative: kept as it comes out rather than clamped, because a negative
+# value there is information about the friction line, not an error to be hidden.
+#
+# WHY Fn = 0.30 IS A BAD VALIDATION POINT.  Rr is 1.134 N there, 0.31 per cent of
+# displacement weight, so it magnifies every error in the prediction.  By Fn = 0.45 it is
+# 15.5 N and 4.2 per cent.  Comparisons should be read across the range, not at one speed.
+#
+# ATTITUDE CONVENTIONS, assumed and not yet confirmed against the release: `sinkage_mm` is
+# the workbook's z, negative meaning the model sank, and `trim_deg` is its theta, taken as
+# bow-down positive to match Attitude, which also takes degrees rather than radians.  The reference point for z is not stated in the
+# workbook; the towing point is 255 mm above the waterline and the transducers sit 0.53664 m
+# forward and 0.46336 m aft of the centre of gravity.  Below Fn = 0.35 the trim is under 0.11
+# degrees and the convention hardly matters; by Fn = 0.50 it is 3.2 degrees and matters a
+# great deal.
+
+[sysser01.conditions]
+source = "4TU.ResearchData 10.4121/21501402, DSYHS_all_measurements_modelscale.xlsx, sheet 'Sys 1'"
+licence = "CC0"
+block = "Bare hull upright"
+temperature_c = 17.3
+density = 998.72             # kg/m^3, computed from the temperature
+viscosity = 1.0749e-6        # m^2/s, computed from the temperature
+towing_point_above_waterline_mm = 255.0
+distance_forward_transducer_to_cog = 0.53664   # m
+distance_aft_transducer_to_cog = -0.46336      # m
+
+[sysser01.bare_hull_upright]
+speed = [0.396, 0.594, 0.792, 0.990, 1.189, 1.387, 1.585, 1.783, 1.981, 2.179, 2.377]
+total_resistance = [0.257851, 0.616414, 1.10840, 1.88482, 3.01934, 4.75255, 9.79318,
+                    19.41220, 32.70270, 44.55760, 51.14900]
+sinkage_mm = [0.380474, -1.16412, -2.69877, -5.04608, -6.56515, -10.4245, -14.9259,
+              -24.9623, -30.7740, -23.9452, -21.2243]
+trim_deg = [-0.0148969, 0.0326586, 0.00974028, 0.0217724, -0.0315127, -0.10084, -0.564345,
+            -1.62161, -3.18522, -4.66556, -5.26946]

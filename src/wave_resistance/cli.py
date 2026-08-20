@@ -18,7 +18,8 @@ _COMPARABLE = [
     ("lwl", "lwl", "m"), ("bwl", "bwl", "m"), ("draught", "tc", "m"),
     ("volume", "volume", "m^3"), ("wetted_area", "wetted_area", "m^2"),
     ("waterplane_area", "waterplane_area", "m^2"),
-    ("cp", "cp", "-"), ("cm", "cm", "-"), ("cwp", "cwp", "-"),
+    ("midship_area", "midship_area", "m^2"),
+    ("cp", "cp", "-"), ("cm", "cm", "-"), ("cb", "cb", "-"), ("cwp", "cwp", "-"),
 ]
 
 
@@ -93,12 +94,20 @@ def _cmd_hydrostatics(args: argparse.Namespace) -> int:
         for attr, key, unit in _COMPARABLE:
             got, want = getattr(r, attr), ref[key]
             print(f"  {attr:<18}{got:>14.6f}{want:>14.6f}{100 * (got / want - 1):>+10.3f}")
-        print(f"  {'lcb_from_midship':<18}{r.lcb_from_midship:>14.6f}{ref['lcb']:>14.6f}"
-              f"{100 * (r.lcb_from_midship / ref['lcb'] - 1):>+10.3f}")
-        print("\n  Lwl, Bwl and Sc differ by more than the mesh is uncertain by. The supplied\n"
-              "  IGES is a 2012 re-measurement ('Rhino modellen na inmeten 2012', patch named\n"
-              "  'Gerebuild oppervlak' = reconstructed surface); the published table may derive\n"
-              "  from the original 1981 lines. Unresolved until M4 checks the primary release.")
+        # The release states the datum: "with respect to 1/2 waterline length <in upright
+        # condition!>", so both centroids are compared from the waterline midpoint.
+        for attr, key in (("lcb_from_midship", "lcb"), ("lcf_from_midship", "lcf")):
+            got, want = getattr(r, attr), ref[key]
+            print(f"  {attr:<18}{got:>14.6f}{want:>14.6f}"
+                  f"{100 * (got / want - 1):>+10.3f}")
+        print("\n  Datum for LCB and LCF is the midpoint of the *upright* waterline, negative\n"
+              "  aft, as stated on the release's Info sheet.")
+        print("\n  Lwl, Bwl and Sc differ by more than the mesh is uncertain by, and the\n"
+              "  primary release has now been checked, so the published table is not the\n"
+              "  explanation. The supplied IGES is a 2012 re-measurement ('Rhino modellen na\n"
+              "  inmeten 2012', patch named 'Gerebuild oppervlak' = reconstructed surface)\n"
+              "  while the table describes the hull the series was built and towed as. Carry\n"
+              "  the difference as a geometry-provenance bias in every comparison below.")
     return 0
 
 
@@ -114,8 +123,9 @@ def _cmd_nk(args: argparse.Namespace) -> int:
         base = hull.with_datum_shift(0.0).mesh(args.nu, args.nv)
         shift = float(base.vertices[:, 2].min()) + args.draught
     hull = hull.with_datum_shift(shift)
-    attitude = Attitude(sinkage=args.sinkage, trim=np.radians(args.trim),
-                        heel=np.radians(args.heel))
+    # Attitude takes trim and heel in degrees, which is also what the flags are in, so no
+    # conversion.  Converting here is the mistake the hydrostatics command avoids.
+    attitude = Attitude(sinkage=args.sinkage, trim=args.trim, heel=args.heel)
     mesh = hull.waterline_fitted_mesh(args.girth, args.stations, attitude,
                                       first_depth=args.first_depth)
     fine = hydrostatics(hull.mesh(args.nu, args.nv, attitude))

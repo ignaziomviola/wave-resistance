@@ -706,15 +706,25 @@ Not established:
 centroid rule, is legitimate — the wave kernel is bounded for $z < 0$ — but coarse. Measured
 on the thin Wigley hull at 158 panels, $Fn = 0.30$, against the Michell oracle:
 
-| order | far-field / oracle | pressure / oracle | change in far-field |
+| order | far-field / oracle | change in far-field | pressure / oracle |
 |---|---|---|---|
-| 1 | 1.013 | 0.953 | — |
-| 2 | 0.891 | 1.010 | −12.1 % |
+| 1 | 1.013 | — | 0.953 |
+| 2 | 0.891 | −12.1 % | 1.010 |
+| 3 | 0.864 | −3.0 % | 1.174 |
 
-Twelve per cent, where $(k_0h)^2/24$ would predict 1.6 per cent. The excess is the
-near-surface pairs, where the kernel varies on the scale of $|z_i + z_j|$ rather than of the
-wavelength. Order 2 costs four times the assembly, which at 1164 microseconds per pair is
-not affordable as a default, so order 1 stays and `solve_nk` reports the bias in its notes.
+The far-field value converges, at $-12$ then $-3$ per cent, towards about 0.86; the pressure
+value moves the other way, to 1.17. Since $B/L = 0.02$ means the true Neumann–Kelvin answer
+is within $O(B/L)$, i.e. a couple of per cent, of Michell, **both** are in error at 158
+panels and they bracket the oracle from either side. At 278 panels they close to 0.936 and
+0.940 (§16.3), so what this table measures is not the quadrature order alone but the
+combined uncertainty of a 158-panel mesh, about 15 per cent.
+
+The honest reading is therefore narrower than "order 1 is 12 per cent low": order 1 carries a
+bias of order 10 per cent on a mesh this coarse, the sign of which depends on the route, and
+$(k_0h)^2/24$ would predict 1.6 per cent — the excess coming from the near-surface pairs,
+where the kernel varies on the scale of $|z_i + z_j|$ rather than of the wavelength. Order 2
+costs four times the assembly, which at 1164 microseconds per pair is not affordable as a
+default, so order 1 stays and `solve_nk` reports the bias in its notes.
 
 ### 18.4 What would actually fix this
 
@@ -735,3 +745,110 @@ effort:
    addresses the actual cause rather than the cost.
 
 All three are outside M3.
+
+---
+
+# M4 results: Sysser 01 against the official Delft data
+
+## 19. The hydrostatics reconcile, except in three quantities
+
+The primary releases were downloaded rather than inferred:
+
+- hydrostatics — 4TU.ResearchData [10.4121/21501375](https://doi.org/10.4121/21501375), file
+  `DSYHS_hydrostatics_modelscale.xlsx`, verified against the release's published MD5
+  `8d041601483f5d165d2198446eb7f4de`;
+- measurements — 4TU.ResearchData [10.4121/21501402](https://doi.org/10.4121/21501402), file
+  `DSYHS_all_measurements_modelscale.xlsx`.
+
+Both are CC0. Every value in `data/sysser01_reference.toml` now comes from row `Sysser = 1`
+of the sheet *Canoe body hydrostatics*, and the figures supplied during review — which had no
+source attached — turn out to agree with the release exactly. Three quantities are new from
+the release: LCF, the midship area, and $C_B$.
+
+**The LCB datum is resolved, and it was worth checking.** The release's own *Info* sheet
+states that LCB and LCF are measured "with respect to 1/2 waterline length *in upright
+condition!*". The exclamation mark is theirs, and it matters: for the heeled columns the
+datum stays the upright half-waterline point rather than moving with the heeled waterline.
+
+**The heeled columns hold displacement constant.** $\nabla_{10} = \nabla_{20} = \nabla_{30}
+= \nabla_0 = 0.0376136$ m³ exactly, so the heeled hydrostatics were computed at fixed
+displacement with sinkage and trim solved for. A test that rotates a hull at fixed sinkage and
+expects the volume to be conserved is therefore wrong; the plan contained one and it is
+removed.
+
+Computed against published, at the reference condition set by matching the official
+displacement at zero trim, on a 32 × 160 mesh:
+
+| | computed | published | diff |
+|---|---|---|---|
+| $\nabla_c$ | 0.037614 m³ | 0.037614 | **−0.000 %** |
+| $A_w$ | 0.558230 m² | 0.558566 | **−0.060 %** |
+| $T_c$ | 0.127143 m | 0.127040 | +0.081 % |
+| $A_m$ | 0.041597 m² | 0.041651 | −0.130 % |
+| $C_p$ | 0.562243 | 0.564414 | −0.385 % |
+| $L_{wl}$ | 1.608268 m | 1.600000 | **+0.517 %** |
+| $B_{wl}$ | 0.513026 m | 0.507200 | **+1.149 %** |
+| $C_m$ | 0.637722 | 0.646410 | −1.344 % |
+| $C_{wp}$ | 0.676575 | 0.688296 | −1.703 % |
+| $C_b$ | 0.358555 | 0.364842 | −1.723 % |
+| $S_c$ | 0.656026 m² | 0.642534 | **+2.100 %** |
+| LCB from midship | −0.034366 m | −0.036640 | +2.27 mm |
+| LCF from midship | −0.050752 m | −0.053280 | +2.53 mm |
+
+Displacement and waterplane area agree to better than 0.06 per cent, which is the mesh's own
+uncertainty. Waterline length, waterline beam and wetted area do not, and now that the
+primary release has been read, **the published table is not the explanation**. The remaining
+candidate is the geometry's provenance: the IGES header path reads *"Rhino modellen na
+inmeten 2012"* (Rhino models after measuring, 2012) and the single patch is named
+*"Gerebuild oppervlak"* (reconstructed surface). The file is a 2012 re-measurement of the
+physical model; the table describes the hull as the series was built and towed. A 1 to 2 per
+cent difference in $B_{wl}$ and $S_c$ between an original lines plan and a re-measured hull
+is unremarkable, and $S_c$ — the quantity most sensitive to local surface fairness — shows the
+largest gap.
+
+This is recorded as an **unresolved geometry-provenance discrepancy of stated magnitude**,
+carried as a bias in every downstream comparison, and not assumed away. Earlier work checked
+that attitude does not explain it: solving heave *and* trim to force $\nabla_c$ and LCB to
+match converges to 0.57° bow-up and makes $L_{wl}$, $B_{wl}$ and $S_c$ all worse.
+
+## 20. The measurements, and why Fn = 0.30 is the wrong place to look
+
+The release gives, per speed, total resistance and the dynamic sinkage and trim. It does not
+give residuary resistance: that follows from an ITTC-57 friction line at form factor zero,
+which is what the series' own reduction does, so **residuary resistance is a proxy for wave
+resistance and not a measurement of it** — it also contains nonlinear and viscous-form
+contributions. The workbook records the tank temperature, 17.3 °C, but leaves its density and
+viscosity cells at zero, so both are computed: $\rho = 998.72$ kg/m³ and
+$\nu = 1.0749\times10^{-6}$ m²/s.
+
+Sysser 01, bare hull upright:
+
+| $Fn$ | 0.10 | 0.20 | 0.25 | 0.30 | 0.35 | 0.40 | 0.45 | 0.50 | 0.60 |
+|---|---|---|---|---|---|---|---|---|---|
+| $R_t$, N | 0.258 | 1.108 | 1.885 | 3.019 | 4.753 | 9.793 | 19.41 | 32.70 | 51.15 |
+| $R_f$, N | 0.265 | 0.911 | 1.357 | 1.885 | 2.487 | 3.162 | 3.909 | 4.727 | 6.571 |
+| $R_r$, N | −0.008 | 0.198 | 0.527 | 1.134 | 2.266 | 6.632 | 15.50 | 27.98 | 44.58 |
+| $R_r/\Delta$ | −0.00002 | 0.0005 | 0.0014 | **0.0031** | 0.0062 | 0.0180 | **0.0421** | 0.0759 | 0.1210 |
+| sinkage, mm | −0.38 | 2.70 | 5.05 | 6.57 | 10.42 | 14.93 | 24.96 | 30.77 | 21.22 |
+| trim, ° | −0.015 | 0.010 | 0.022 | −0.032 | −0.101 | −0.564 | −1.622 | −3.185 | −5.269 |
+
+Two things follow, and both change how M3's numbers should be read.
+
+**At $Fn = 0.30$ the quantity being predicted is 0.31 per cent of displacement weight.** Every
+comparison at that speed divides by 1.13 N. M3's Sysser figures — a far-field resistance
+swinging between 12.8 and 45.5 N and a pressure value between 4.2 and 8.4 N — are 4 to 40
+times that, but the speed was chosen for being in the middle of the plan's range, not for
+being informative. At $Fn = 0.45$ the target is 15.5 N and 4.2 per cent of weight, thirteen
+times larger in absolute terms.
+
+**The subtraction gives a negative residuary at $Fn = 0.10$**, −0.008 N. That is kept as it
+comes out. It says the ITTC-57 line slightly over-predicts the friction of this model at
+$Re = 5.9\times10^5$, which is information about the reduction; clamping it to zero would hide
+the one speed at which the reduction visibly fails.
+
+**The dynamic attitude is not negligible above $Fn = 0.35$.** The model sinks 25 mm and trims
+1.6° bow-up by $Fn = 0.45$, against a canoe-body draught of 127 mm. Comparisons must be run
+at the measured attitude, which is what `measurements.sysser01_runs` supplies, in the units
+`Attitude` takes — metres positive downward and **degrees** bow-down positive. Storing the
+trim in radians and letting the caller convert produced a 57-fold error in the first version
+of this comparison, so the units are now asserted by a test.

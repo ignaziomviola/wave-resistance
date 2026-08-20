@@ -1,28 +1,62 @@
-# Official model-scale hydrostatics for DSYHS Sysser 01 at zero heel.
+# Official model-scale hydrostatics for DSYHS Sysser 01, read directly from the primary
+# release.
 #
-# PROVENANCE.  These figures were supplied during review as the published Delft
-# values and have NOT yet been re-read from the primary release by this code.  The
-# primary sources are:
-#   geometry     https://figshare.com/articles/dataset/Delft_Systematic_Yacht_Hull_Series_Geometries_data/21501330
-#   hydrostatics https://data.4tu.nl/articles/dataset/Delft_Systematic_Yacht_Hull_Series_hydrostatics_data/21501375
-#   measurements https://data.4tu.nl/articles/dataset/Delft_Systematic_Yacht_Hull_Series_Measurement_Data/21501402
-# Milestone M4 replaces this file with values read directly from the hydrostatics
-# release, and records the LCB datum convention, which is presently unverified.
+# PROVENANCE.  Every value below is transcribed from the row `Sysser = 1` of the sheet
+# "Canoe body hydrostatics" in DSYHS_hydrostatics_modelscale.xlsx, from
+#   https://doi.org/10.4121/21501375  (4TU.ResearchData, CC0, Jasper den Ouden, 2022-11-17)
+# downloaded as https://ndownloader.figshare.com/files/38098641 and verified against the
+# release's published MD5 8d041601483f5d165d2198446eb7f4de.  The file's own "Info" sheet
+# supplies the units and the datum conventions quoted below.
 #
-# The table is internally consistent on its own numbers: Aw/(Lwl*Bwl) = 0.68818 against
-# the quoted Cwp = 0.688296, and Am/(Bwl*Tc) = 0.64632 against the quoted Cm = 0.646410,
-# where Am follows from Cp and the displacement.  So it describes a real hull.
+# The values an earlier version of this file carried, supplied during review without a
+# source, agree with the release exactly, so nothing here changed except that it is now
+# sourced.  Three quantities are new: lcf, am and cb.
+#
+# DATUM, now verified rather than assumed.  The Info sheet states that lcb and lcf are
+# measured "with respect to 1/2 waterline length <in upright condition!>", so the origin is
+# the midpoint of the upright waterline and negative is aft.  The exclamation mark is the
+# release's own: for the heeled columns the datum stays the *upright* half-waterline point.
+#
+# The heeled columns hold volc10 = volc20 = volc30 = volc0 exactly, so the heeled
+# hydrostatics were computed at constant displacement with sinkage and trim solved for.  A
+# test that rotates a hull at fixed sinkage and expects the volume to be conserved is
+# therefore wrong, and the project plan contained one; it is removed.
+#
+# Internal consistency, checked here rather than assumed: cb = volc/(lwl bwl tc) = 0.364842,
+# cm = am/(bwl tc) = 0.646410, cp = cb/cm = 0.564414, cw = aw/(lwl bwl) = 0.688296.  All four
+# reproduce the release's own cb0, cm0, cp0 and cw0.
 
 [sysser01]
-source = "review-supplied; to be re-read from 4TU 21501375 in M4"
+source = "4TU.ResearchData 10.4121/21501375, DSYHS_hydrostatics_modelscale.xlsx, row Sysser=1"
+md5 = "8d041601483f5d165d2198446eb7f4de"
+licence = "CC0"
+series = 1
+overhang = 1                # 1 = original overhang (Info sheet)
 heel_deg = 0.0
-lwl = 1.600000            # m
-bwl = 0.507200            # m
-tc = 0.127040             # m, canoe-body draught
-volume = 0.0376136        # m^3
-wetted_area = 0.642534    # m^2
+lwl = 1.600000              # m
+bwl = 0.507200              # m
+tc = 0.127040               # m, maximum canoe-body draught
+volume = 0.0376136          # m^3, canoe-body volume
+wetted_area = 0.642534      # m^2
 waterplane_area = 0.558566  # m^2
-cp = 0.564414
-cm = 0.646410
-cwp = 0.688296
-lcb = -0.036640           # m, dataset convention (datum unverified)
+midship_area = 0.0416512    # m^2, maximum sectional area
+lcb = -0.036640             # m, from the midpoint of the upright waterline, aft negative
+lcf = -0.053280             # m, same datum
+cb = 0.36484230452674
+cm = 0.6464095967559
+cp = 0.56441350245688
+cwp = 0.68829599143772
+
+# Heeled conditions, at the same displacement.  Kept for the deferred heeled work (M5); the
+# lcb and lcf datum remains the upright half-waterline point.
+[sysser01.heeled]
+heel_deg = [10.0, 20.0, 30.0]
+lwl = [1.59632, 1.55792, 1.53184]
+bwl = [0.50368, 0.48752, 0.47248]
+tc = [0.12272, 0.11728, 0.12240]
+volume = [0.0376136, 0.0376136, 0.0376136]
+wetted_area = [0.644941, 0.639565, 0.634778]
+waterplane_area = [0.554317, 0.547226, 0.541875]
+midship_area = [0.0416256, 0.0418816, 0.0423424]
+lcb = [-0.036800, -0.036960, -0.037120]
+lcf = [-0.051520, -0.047680, -0.042240]

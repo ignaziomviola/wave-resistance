@@ -116,10 +116,13 @@ def wave_influence_matrix(mesh: TriMesh, k0: float, order: int = 1,
     ``order`` sets the quadrature over the *source* panel.  Order 1 is the centroid rule.
     Unlike the Rankine part the wave kernel is bounded for z < 0, so the centroid rule is a
     legitimate low-order choice rather than a singular one -- but it is a coarse choice, and
-    measurably so: on a thin Wigley hull at 158 panels and Fn = 0.30 going from order 1 to
-    order 2 moved the far-field resistance by 12 per cent.  A naive estimate from
-    (k0 h)^2/24 would predict 1.6 per cent; the discrepancy is the near-surface pairs, where
-    the kernel varies on the scale of |z_i + z_j| rather than of the wavelength.
+    measurably so: on a thin Wigley hull at 158 panels and Fn = 0.30, orders 1, 2 and 3 give
+    1.013, 0.891 and 0.864 of the Michell value by the far-field route and 0.953, 1.010 and
+    1.174 by the pressure route.  The two bracket the oracle, so order 1 carries a bias of
+    order 10 per cent on a mesh that coarse and the sign of it depends on the route.  A naive
+    estimate from (k0 h)^2/24 would predict 1.6 per cent; the excess is the near-surface
+    pairs, where the kernel varies on the scale of |z_i + z_j| rather than of the
+    wavelength.
 
     Order 2 therefore costs four times the assembly for a difference that is not negligible,
     and at 1164 microseconds per panel pair that is not affordable as a default.  It stays at
@@ -388,8 +391,9 @@ def solve_nk(mesh: TriMesh, speed: float, length: float, rho: float = 1000.0,
                      "not converged at this panel count -- compare the pressure route")
     if order <= 1:
         notes.append("wave influences use the centroid rule over the source panel; on a "
-                     "thin Wigley hull at 158 panels order 2 moved the far-field resistance "
-                     "by 12 per cent, so treat this as a bias of that size")
+                     "thin Wigley hull at 158 panels raising the order moved the far-field "
+                     "resistance by 12 then 3 per cent, so treat this as a bias of order "
+                     "10 per cent at that panel count")
     if not diag["converged"]:
         notes.append("the wave-resistance integral did not certify its tail")
     if diag.get("capped") and diag.get("beyond_cap", 0.0) > 0.02 * max(integral, 1e-30):
