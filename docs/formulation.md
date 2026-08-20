@@ -580,18 +580,37 @@ $u\varphi_x$ by one order in slenderness, and the first implementation dropped i
 basis.
 
 That is sound for a thin hull and wrong for anything else, and the thin-hull oracle cannot
-see the difference. On a fully submerged sphere, where $|\nabla\varphi|$ is $O(u)$ on the
-body, dropping it left the pressure route 68 per cent below the far-field value with a net
-source flux of only 1.3e-4 — so neither the waterline nor incoherent error was responsible.
-The submerged sphere is what identified this: it removes the waterline entirely, and the
-discrepancy survived.
+see the difference. The submerged sphere is what identified it, because it removes the
+waterline entirely and the discrepancy survived. At radius 0.1 m and $k_0 d = 2$, 320
+panels, with a net source flux of only 1.3e-4 — so neither the waterline nor incoherent
+error was responsible:
+
+| | far-field | pressure, linear only | pressure, full |
+|---|---|---|---|
+| $R_W$, N | 1.2663 | 0.7546 | 1.1459 |
+| far-field / pressure | — | 1.678 | **1.105** |
+
+The quadratic term is $+51.9$ per cent of the linear one here, against $-1.9$ per cent on the
+thin Wigley hull, which is the slenderness scaling made visible. With it the two routes
+agree to 10.5 per cent at 320 panels and 27 per cent at 80, so they converge towards each
+other; without it they sit 68 per cent apart at 320 panels and would not converge at all,
+because the missing term does not vanish under refinement.
 
 ### 16.3 What each route is for
 
 - **Thin or slender bodies, converged density.** Either route; they agree. On the Wigley
-  hull at $B/L = 0.02$, $T/L = 0.0625$, the far-field gives 0.942 of Michell at $Fn = 0.30$
-  and 0.940 at $0.40$, the pressure route 0.958 and 0.993, at 278 panels; at 558 panels
-  0.928 and 0.979. The solved density averages $1.04\,u\,n_x$, confirming §4's derivation.
+  hull at $B/L = 0.02$, $T/L = 0.0625$, $Fn = 0.30$, 278 panels, with the resolution cap
+  applied and the full Bernoulli pressure: far-field 0.936 of Michell, pressure 0.940, the
+  two within **0.4 per cent** of each other. The quadratic term is only $-1.9$ per cent
+  here, as slenderness predicts, and without it the two routes sit 2.3 per cent apart
+  instead.
+
+  Uncapped and with the linear pressure only — the variant the wider sweep used — the same
+  hull gives far-field / Michell of 0.942 at $Fn = 0.30$ and 0.940 at $0.40$ against
+  pressure 0.958 and 0.993 at 278 panels, and 0.928 against 0.979 at 558. Every one of
+  these is within 7 per cent of the oracle, which is the point; the spread between the
+  variants, 2 per cent, is the honest uncertainty of a 278-panel mesh. The solved density
+  averages $1.04\,u\,n_x$, confirming §4's derivation.
 - **Anything with a coarse density.** The pressure route, with the far-field value reported
   alongside as an upper bound and the net source flux as the reason. The far-field estimate
   is not merely noisier — it is biased one way.
@@ -632,3 +651,87 @@ $u\,S$, and the far-field resistance falls from 45.5 N to 12.8 N over that refin
 resistance is therefore **not converged on Sysser 01 at any panel count the 10-minute
 assembly budget allows**, and no amount of presentation changes that. Section 18 records how
 far the trend goes when the budget is deliberately exceeded.
+
+## 18. Sysser 01: what the method actually delivers, and what it does not
+
+Everything above is either a derivation or a measurement on a case with an analytic answer.
+This section is the worked hull, and the result is negative in a specific and useful way.
+
+### 18.1 The refinement trend
+
+Sysser 01 at $Fn = 0.30$, waterline-fitted mesh, topmost panel row's lower edge 10 mm below
+the surface, displacement weight 368.86 N:
+
+| panels | 160 | 280 | 480 |
+|---|---|---|---|
+| $R_W$ far-field, N | 45.52 | 12.83 | 29.11 |
+| $R_W$ pressure (linear term only), N | 8.59 | 4.21 | 7.55 |
+| far-field / pressure | 5.30 | 3.05 | 3.85 |
+| body residual, rms as a fraction of $u$ | 0.093 | 0.098 | 0.042 |
+| net source flux, fraction of $u\,S$ | 0.081 | — | — |
+| max $|\sigma|/u$ | 2.39 | 1.31 | 2.26 |
+
+The body-condition residual behaves: it more than halves from 280 to 480 panels, so the
+*solution* is converging. The resistance does not. The far-field value swings by a factor of
+3.5 with no sign of a limit, and it is not even monotone.
+
+That combination is exactly what §16.1 predicts. The far-field integral is positive-definite
+in $\sigma$, so it carries a $+C\int|\delta A|^2$ term; $\delta A$ falls only as fast as the
+density error, while $A$ itself is a strongly cancelling oscillatory integral. A residual
+falling from 10 to 4 per cent is therefore entirely compatible with a resistance that is
+still dominated by its own error term.
+
+### 18.2 What is and is not established
+
+Established, on cases with analytic answers:
+
+- the formulation, the Green function and its gradient, the influence matrix, the solve, and
+  both resistance routes are correct and mutually consistent, to 0.4 per cent between the
+  two routes on a thin Wigley hull at 278 panels, both at 0.94 of the Michell value;
+- the thin-ship density is $u\,n_x$ and the resistance constant $\rho g^2/(\pi u^4)$, both
+  derived and both confirmed numerically;
+- the wave-kernel quadrature is accurate to 7.0e-4 in the worst case and 6e-11 in the median
+  over the region a Sysser mesh spans.
+
+Not established:
+
+- **a converged wave resistance for Sysser 01.** At every panel count the ten-minute
+  assembly budget allows, the far-field resistance is dominated by discretisation error.
+  This is not a presentational matter and it is not resolved by choosing a mesh whose answer
+  looks plausible.
+
+### 18.3 The source-panel quadrature is a second, separate bias
+
+`order` sets the quadrature over the source panel for the wave influence. Order 1, the
+centroid rule, is legitimate — the wave kernel is bounded for $z < 0$ — but coarse. Measured
+on the thin Wigley hull at 158 panels, $Fn = 0.30$, against the Michell oracle:
+
+| order | far-field / oracle | pressure / oracle | change in far-field |
+|---|---|---|---|
+| 1 | 1.013 | 0.953 | — |
+| 2 | 0.891 | 1.010 | −12.1 % |
+
+Twelve per cent, where $(k_0h)^2/24$ would predict 1.6 per cent. The excess is the
+near-surface pairs, where the kernel varies on the scale of $|z_i + z_j|$ rather than of the
+wavelength. Order 2 costs four times the assembly, which at 1164 microseconds per pair is
+not affordable as a default, so order 1 stays and `solve_nk` reports the bias in its notes.
+
+### 18.4 What would actually fix this
+
+The obstruction is arithmetic, not conceptual. Assembly costs 1164 microseconds per panel
+pair, so the influence matrix alone is 28 minutes at 1200 panels and 48 at 1500, with the
+pressure route's gradient matrix costing the same again, and §18.1 gives no reason to believe
+1500 panels would be enough. Three things would change the picture, in ascending order of
+effort:
+
+1. **Raise the source-panel order only for the pairs that need it.** The 12 per cent of
+   §18.3 comes from near-surface pairs, a small fraction of the total, so a per-pair
+   criterion would buy most of order 2 at close to the cost of order 1.
+2. **Tabulate and interpolate the Kelvin kernel.** The plan defers this until pointwise
+   accuracy is established. It now is, to 7e-4 worst and 6e-11 median (§15), so this is
+   unblocked, and it is where the factor of ten lives.
+3. **Represent the density better than piecewise constant.** This would cure the
+   first-order convergence of §14 as well, and it is the only one of the three that
+   addresses the actual cause rather than the cost.
+
+All three are outside M3.

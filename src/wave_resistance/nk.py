@@ -113,10 +113,19 @@ def wave_influence_matrix(mesh: TriMesh, k0: float, order: int = 1,
                           chunk: int = 4096, kernel_refine: float = 1.0) -> np.ndarray:
     """Normal velocity at each field point from unit source density on each panel, wave part.
 
-    ``order`` sets the quadrature over the *source* panel.  Order 1 is the centroid rule;
-    unlike the Rankine part the wave kernel is smooth, so that is a defensible choice, but
-    it is a choice and :func:`influence_matrix` records it so a convergence check can be
-    run against a higher order.
+    ``order`` sets the quadrature over the *source* panel.  Order 1 is the centroid rule.
+    Unlike the Rankine part the wave kernel is bounded for z < 0, so the centroid rule is a
+    legitimate low-order choice rather than a singular one -- but it is a coarse choice, and
+    measurably so: on a thin Wigley hull at 158 panels and Fn = 0.30 going from order 1 to
+    order 2 moved the far-field resistance by 12 per cent.  A naive estimate from
+    (k0 h)^2/24 would predict 1.6 per cent; the discrepancy is the near-surface pairs, where
+    the kernel varies on the scale of |z_i + z_j| rather than of the wavelength.
+
+    Order 2 therefore costs four times the assembly for a difference that is not negligible,
+    and at 1164 microseconds per panel pair that is not affordable as a default.  It stays at
+    order 1, :func:`solve_nk` says so in its notes, and the concrete improvement -- raising
+    the order only for the near pairs that need it, which are a small fraction -- is recorded
+    in ``docs/formulation.md`` section 18 as work outside M3.
 
     ``kernel_refine`` scales the wave-angle quadrature inside the Green function itself.
     The two refinements are independent and V10 exercises them separately: ``order``
@@ -378,8 +387,9 @@ def solve_nk(mesh: TriMesh, speed: float, length: float, rho: float = 1000.0,
         notes.append(f"net source flux is {flux:.1%} of u S; the far-field resistance is "
                      "not converged at this panel count -- compare the pressure route")
     if order <= 1:
-        notes.append("wave influences use the centroid rule over the source panel; "
-                     "raise `order` and compare to bound that choice")
+        notes.append("wave influences use the centroid rule over the source panel; on a "
+                     "thin Wigley hull at 158 panels order 2 moved the far-field resistance "
+                     "by 12 per cent, so treat this as a bias of that size")
     if not diag["converged"]:
         notes.append("the wave-resistance integral did not certify its tail")
     if diag.get("capped") and diag.get("beyond_cap", 0.0) > 0.02 * max(integral, 1e-30):
