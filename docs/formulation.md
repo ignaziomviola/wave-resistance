@@ -529,3 +529,106 @@ $$\text{cycles} = \frac{1}{2\pi}\left[\frac{\text{reach}\,|Y|}{|Z|}
 which depends on $|Y|/|Z|$ and not on $|Z|$ alone. A Sysser 01 mesh at $Fn = 0.30$ with its
 topmost centroid 1 mm down reaches 1699 cycles — comfortably inside — where the old
 constraint would have demanded 7 mm and a mesh that cannot be built near the bow and stern.
+
+## 16. Two routes to the resistance, and what each is good for
+
+The plan gives the reason for taking the resistance from the far-field amplitude rather than
+by integrating hull pressure: it is "far less sensitive to panel-level pressure error". The
+measurements below say the opposite, and it is worth being precise about why, because the
+two estimators fail in completely different ways and neither failure is obvious.
+
+### 16.1 The far-field integral is positive-definite in the source density
+
+$R_W = C\int \tfrac12(|A_+|^2+|A_-|^2)\lambda^2(\lambda^2-1)^{-1/2}\mathrm{d}\lambda$ is a
+positive-definite quadratic form in $\sigma$. Writing $\sigma = \sigma_\text{true} + \delta$,
+
+$$R_W = R_\text{true}
+ + 2C\!\int\!\operatorname{Re}\!\left(A_\text{true}^*\,\delta A\right)(\cdots)
+ + C\!\int\!|\delta A|^2(\cdots) , \tag{16.1}$$
+
+and the last term is strictly positive. Discretisation error can therefore only *raise* the
+far-field resistance; it can never cancel. Worse, $A(\lambda)$ is a strongly oscillatory
+integral, so the signal carries heavy phase cancellation while error adds incoherently. The
+amplification is severe.
+
+Measured by injecting known Gaussian noise into a converged density on a thin Wigley hull,
+$B/L = 0.02$, 278 panels, $Fn = 0.30$, against the Michell oracle:
+
+| noise on $\sigma$ | 0 | 5 % of $u$ | 10 % | 20 % | 40 % |
+|---|---|---|---|---|---|
+| far-field / oracle | 0.936 | 1.997 | 4.165 | 26.08 | 87.59 |
+| pressure / oracle | 0.958 | 1.018 | 0.333 | 1.759 | 0.515 |
+
+**Five per cent of noise on the density doubles the far-field resistance.** The pressure
+route, being a bilinear form with no definite sign, stays near unity on average and scatters
+either side of it — which is its own hazard, but a different one.
+
+This is the mechanism behind the net-source-flux diagnostic. For a closed body in a stream
+$\int\sigma\,\mathrm{d}S$ vanishes, and the free surface can carry only a little, so its
+size is a direct measure of the incoherent part of the error — and it feeds
+$A(\lambda)$ hardest near $\lambda = 1$, which is where the resistance integrand is largest.
+It is reported by every solve.
+
+### 16.2 The quadratic Bernoulli term is not optional
+
+Steady Bernoulli gives
+$p = \rho u\varphi_x - \rho g z - \tfrac12\rho|\nabla\varphi|^2$. The hydrostatic term
+carries no $x$-force — over the wetted surface closed by the $z=0$ lid the divergence
+theorem gives $\int z\,n_x\,\mathrm{d}S = 0$, and on a Sysser 01 mesh it comes to 6e-5 of
+its own scale, so the mesh honours the identity. The quadratic term is smaller than
+$u\varphi_x$ by one order in slenderness, and the first implementation dropped it on that
+basis.
+
+That is sound for a thin hull and wrong for anything else, and the thin-hull oracle cannot
+see the difference. On a fully submerged sphere, where $|\nabla\varphi|$ is $O(u)$ on the
+body, dropping it left the pressure route 68 per cent below the far-field value with a net
+source flux of only 1.3e-4 — so neither the waterline nor incoherent error was responsible.
+The submerged sphere is what identified this: it removes the waterline entirely, and the
+discrepancy survived.
+
+### 16.3 What each route is for
+
+- **Thin or slender bodies, converged density.** Either route; they agree. On the Wigley
+  hull at $B/L = 0.02$, $T/L = 0.0625$, the far-field gives 0.942 of Michell at $Fn = 0.30$
+  and 0.940 at $0.40$, the pressure route 0.958 and 0.993, at 278 panels; at 558 panels
+  0.928 and 0.979. The solved density averages $1.04\,u\,n_x$, confirming §4's derivation.
+- **Anything with a coarse density.** The pressure route, with the far-field value reported
+  alongside as an upper bound and the net source flux as the reason. The far-field estimate
+  is not merely noisier — it is biased one way.
+
+Both are computed and both are reported. `nk.solve_nk` returns the far-field value with the
+flux and residual diagnostics beside it, and warns when the flux exceeds one per cent.
+
+## 17. Corrections to the plan's verification criteria
+
+Three of the plan's acceptance criteria did not survive measurement. They are corrected here
+rather than quietly reinterpreted.
+
+**V3, "0.5 per cent at 1200 panels, second-order convergence".** Wrong rate. Piecewise-
+constant collocation is first order in the density; section 14 records the measurement and
+the corrected expectation.
+
+**V4, "large separation → Rankine + image".** Wrong limit. The Kelvin waves decay as
+$x^{-1/2}$ along the track while the Rankine pair decays as $x^{-2}$, so the wave part
+*dominates* at large separation — measured at 6 times the Rankine part at $X = 2$ and
+6.2e4 at $X = 200$. The correct limit is large *depth*, where the free surface becomes a
+rigid wall; section 8 gives it.
+
+**V11, "far-field $R_w$ vs independent pressure/energy evaluation, 5 per cent".** The
+threshold is met on an oracle case — 0.4 per cent between the two routes on a thin Wigley
+hull at 278 panels — but the plan's stated reason for making the far-field route primary,
+that it is "far less sensitive to panel-level pressure error", is the wrong way round.
+Section 16 gives the measurements: the far-field form is positive-definite in $\sigma$ and
+five per cent of noise on the density doubles it, while the pressure route moves by two per
+cent. V11 is therefore not only a consistency check between two roughly equal estimators.
+It is the check that tells you whether the far-field number can be used at all, and the net
+source flux is its early warning.
+
+**V12's thresholds are not reachable on Sysser 01 within the compute budget.** They ask for
+a body-condition residual below 1 per cent of $u$ and a net flux below
+$10^{-6}\,u\,S$. Measured on the Wigley oracle the method is sound; measured on Sysser 01 at
+160 to 280 panels the residual is 9 to 13 per cent of $u$ and the flux 8 per cent of
+$u\,S$, and the far-field resistance falls from 45.5 N to 12.8 N over that refinement. The
+resistance is therefore **not converged on Sysser 01 at any panel count the 10-minute
+assembly budget allows**, and no amount of presentation changes that. Section 18 records how
+far the trend goes when the budget is deliberately exceeded.

@@ -10,7 +10,9 @@ import numpy as np
 from .hull import Attitude, Hull
 from .hydrostatics import RHO_FRESH, hydrostatics, solve_reference_heave
 from .iges import read_iges
+from .nk import check_envelope, pressure_resistance, solve_nk
 from .reference import sysser01_reference
+from .spectrum import mesh_resolved_lambda
 
 _COMPARABLE = [
     ("lwl", "lwl", "m"), ("bwl", "bwl", "m"), ("draught", "tc", "m"),
@@ -18,6 +20,15 @@ _COMPARABLE = [
     ("waterplane_area", "waterplane_area", "m^2"),
     ("cp", "cp", "-"), ("cm", "cm", "-"), ("cwp", "cwp", "-"),
 ]
+
+
+def _froude_list(text: str) -> list[float]:
+    values = [float(part) for part in text.split(",") if part.strip()]
+    if not values:
+        raise argparse.ArgumentTypeError("give at least one Froude number")
+    if any(v <= 0.0 for v in values):
+        raise argparse.ArgumentTypeError("Froude numbers must be positive")
+    return values
 
 
 def _cmd_info(args: argparse.Namespace) -> int:
@@ -91,6 +102,49 @@ def _cmd_hydrostatics(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_nk(args: argparse.Namespace) -> int:
+    hull = Hull.from_iges(args.file)
+    if args.displacement is None and args.draught is None:
+        print("give --displacement or --draught to fix the reference condition",
+              file=sys.stderr)
+        return 2
+    if args.displacement is not None:
+        shift = solve_reference_heave(hull, args.displacement)
+    else:
+        base = hull.with_datum_shift(0.0).mesh(args.nu, args.nv)
+        shift = float(base.vertices[:, 2].min()) + args.draught
+    hull = hull.with_datum_shift(shift)
+    attitude = Attitude(sinkage=args.sinkage, trim=np.radians(args.trim),
+                        heel=np.radians(args.heel))
+    mesh = hull.waterline_fitted_mesh(args.girth, args.stations, attitude,
+                                      first_depth=args.first_depth)
+    fine = hydrostatics(hull.mesh(args.nu, args.nv, attitude))
+    length = args.length if args.length is not None else fine.lwl
+
+    print(f"reference datum shift {shift:.6f} m; Lwl {length:.6f} m; "
+          f"displaced volume {fine.volume:.6f} m^3")
+    print(f"NK mesh {mesh.n_faces} panels, wetted area {mesh.areas().sum():.6f} m^2, "
+          f"topmost centroid {-1000 * mesh.centroids()[:, 2].max():.2f} mm below the surface")
+
+    gravity = 9.80665
+    for froude in args.fn:
+        speed = froude * np.sqrt(gravity * length)
+        k0 = gravity / speed ** 2
+        worst, over = check_envelope(mesh, k0)
+        cap = mesh_resolved_lambda(mesh, k0)
+        print(f"\nFn = {froude:.4f}")
+        print(f"  worst panel-pair oscillation count {worst:.0f}, "
+              f"{over} pairs outside the envelope")
+        print(f"  spectrum resolved to lambda {cap:.2f} by this mesh")
+        result = solve_nk(mesh, speed, length, order=args.order,
+                          spectrum_order=args.spectrum_order, rtol=args.rtol,
+                          check_points=args.check_points, lambda_cap=cap)
+        result.pressure_resistance = pressure_resistance(mesh, result.sigma, speed, k0,
+                                                         order=args.order)
+        print("  " + result.summary().replace("\n", "\n  "))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="wave-resistance",
@@ -118,6 +172,42 @@ def main(argv: list[str] | None = None) -> int:
     p_hyd.add_argument("--compare", action="store_true",
                        help="compare against the published Sysser 01 hydrostatics")
     p_hyd.set_defaults(func=_cmd_hydrostatics)
+
+    p_nk = sub.add_parser("nk", help="Neumann-Kelvin wave resistance at prescribed attitude")
+    p_nk.add_argument("file")
+    p_nk.add_argument("--displacement", type=float, default=None,
+                      help="target displaced volume in m^3; solves for the reference heave")
+    p_nk.add_argument("--draught", type=float, default=None,
+                      help="explicit draught in m above the lowest keel point")
+    p_nk.add_argument("--fn", type=_froude_list, required=True,
+                      help="comma-separated Froude numbers, e.g. 0.25,0.30,0.35")
+    p_nk.add_argument("--length", type=float, default=None,
+                      help="reference length for Fn; defaults to the computed Lwl")
+    p_nk.add_argument("--girth", type=int, default=6,
+                      help="NK mesh rows from the waterline to the keel")
+    p_nk.add_argument("--stations", type=int, default=28,
+                      help="NK mesh stations along the length")
+    p_nk.add_argument("--first-depth", dest="first_depth", type=float, default=0.010,
+                      help="depth in m of the lower edge of the topmost panel row")
+    p_nk.add_argument("--sinkage", type=float, default=0.0,
+                      help="prescribed extra sinkage in m, positive downward")
+    p_nk.add_argument("--trim", type=float, default=0.0,
+                      help="prescribed trim in degrees, bow down positive")
+    p_nk.add_argument("--heel", type=float, default=0.0,
+                      help="prescribed heel in degrees, starboard down positive")
+    p_nk.add_argument("--order", type=int, default=1,
+                      help="quadrature order over the source panel for the wave kernel")
+    p_nk.add_argument("--spectrum-order", dest="spectrum_order", type=int, default=4,
+                      help="quadrature order over the panel for the far-field amplitude")
+    p_nk.add_argument("--rtol", type=float, default=3e-5,
+                      help="tail tolerance for the wave-resistance integral")
+    p_nk.add_argument("--check-points", dest="check_points", type=int, default=40,
+                      help="off-collocation points for the body-condition residual")
+    p_nk.add_argument("--nu", type=int, default=48,
+                      help="girth divisions of the fine mesh used for hydrostatics")
+    p_nk.add_argument("--nv", type=int, default=240,
+                      help="longitudinal divisions of the fine mesh used for hydrostatics")
+    p_nk.set_defaults(func=_cmd_nk)
 
     args = parser.parse_args(argv)
     return args.func(args)

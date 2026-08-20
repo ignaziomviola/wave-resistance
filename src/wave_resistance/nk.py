@@ -26,7 +26,7 @@ from .panels import source_velocity
 from .spectrum import (panel_quadrature, resistance_constant, wave_resistance_integral)
 
 __all__ = ["NKResult", "rankine_with_image_matrix", "wave_influence_matrix",
-           "influence_matrix", "check_envelope", "x_velocity_matrix",
+           "influence_matrix", "check_envelope", "velocity_matrix", "x_velocity_matrix",
            "pressure_resistance", "solve_nk"]
 
 
@@ -44,6 +44,7 @@ class NKResult:
     spectrum_blocks: int
     lambda_reached: float
     spectrum_converged: bool
+    lambda_cap: float = float("inf")
     net_source_flux: float = 0.0
     pressure_resistance: float | None = None
     notes: list[str] = field(default_factory=list)
@@ -56,8 +57,9 @@ class NKResult:
             f"  cond(A)               {self.condition_number:.3e}",
             f"  body residual, rms    {self.body_residual_rms:.3e}  (fraction of u)",
             f"  body residual, max    {self.body_residual_max:.3e}",
-            f"  spectrum blocks       {self.spectrum_blocks}, reached lambda "
+            f"  spectrum blocks       {self.spectrum_blocks}, marched to lambda "
             f"{self.lambda_reached:.1f}, converged={self.spectrum_converged}",
+            f"  spectrum counted to   lambda {self.lambda_cap:.2f}",
             f"  net source flux       {self.net_source_flux:.3e}  (fraction of u S)",
         ]
         if self.pressure_resistance is not None:
@@ -206,28 +208,24 @@ def influence_matrix(mesh: TriMesh, k0: float, wave: bool = True, order: int = 1
     return a
 
 
-def x_velocity_matrix(mesh: TriMesh, k0: float, order: int = 1,
-                      kernel_refine: float = 1.0, chunk: int = 4096) -> np.ndarray:
-    """d(phi)/dx at each panel centroid from unit source density on each panel.
+def velocity_matrix(mesh: TriMesh, k0: float, order: int = 1,
+                    kernel_refine: float = 1.0, chunk: int = 4096) -> np.ndarray:
+    """grad(phi) at each panel centroid from unit source density on each panel, (n, m, 3).
 
-    Needed for the pressure route to the resistance (V11).  The Rankine part is the
-    analytic panel velocity minus its image's; on the diagonal the in-plane components are
-    finite and the formula gives them, but the normal component has the same ambiguity as
-    in :func:`rankine_with_image_matrix` and the fluid-side limit +1/2 is imposed.  The
-    wave part has no singular diagonal.
+    The Rankine part is the analytic panel velocity minus its image's.  On the diagonal the
+    in-plane components are finite and the formula gives them, but the normal component has
+    the same ambiguity as in :func:`rankine_with_image_matrix`, and the fluid-side limit
+    +1/2 is imposed.  The wave part has no singular diagonal.
     """
     tri = mesh.triangles()
     centroids = mesh.centroids()
     normals = mesh.unit_normals()
 
     v = source_velocity(tri, centroids)                                  # (n, m, 3)
-    # Impose the fluid-side normal limit on the diagonal, keeping the in-plane part.
     idx = np.arange(mesh.n_faces)
     normal_component = np.einsum("ni,ni->n", v[idx, idx, :], normals)
     v[idx, idx, :] += (0.5 - normal_component)[:, None] * normals
     v = v - source_velocity(_mirrored_in_z(tri), centroids)
-
-    out = v[:, :, 0].copy()
 
     if order <= 1:
         q_pts = centroids[:, None, :]
@@ -246,50 +244,72 @@ def x_velocity_matrix(mesh: TriMesh, k0: float, order: int = 1,
         X = k0 * (fp[:, None, 0] - flat_q[None, :, 0])
         Y = k0 * (fp[:, None, 1] - flat_q[None, :, 1])
         Z = np.minimum(k0 * (fp[:, None, 2] + flat_q[None, :, 2]), -1e-9)
-        # d/dx of k0 g_w is k0^2 times the X-derivative of g_w.
-        gx = wave_part_gradient(X, Y, Z, refine=kernel_refine)[..., 0] * k0 ** 2
-        gx = gx * flat_w[None, :]
+        # grad of k0 g_w is k0^2 times the gradient with respect to (X, Y, Z).
+        g = wave_part_gradient(X, Y, Z, refine=kernel_refine) * k0 ** 2
+        g = g * flat_w[None, :, None]
         if n_q == 1:
-            out[rows] += gx
+            v[rows] += g
         else:
-            acc = np.zeros((fp.shape[0], n_src))
-            np.add.at(acc.T, src_index, gx.T)
-            out[rows] += acc
-    return out
+            acc = np.zeros((fp.shape[0], n_src, 3))
+            np.add.at(acc.transpose(1, 0, 2), src_index, g.transpose(1, 0, 2))
+            v[rows] += acc
+    return v
+
+
+def x_velocity_matrix(mesh: TriMesh, k0: float, order: int = 1,
+                      kernel_refine: float = 1.0, chunk: int = 4096) -> np.ndarray:
+    """The x-component of :func:`velocity_matrix`, kept for the linear pressure route."""
+    return velocity_matrix(mesh, k0, order=order, kernel_refine=kernel_refine,
+                           chunk=chunk)[:, :, 0]
 
 
 def pressure_resistance(mesh: TriMesh, sigma: np.ndarray, speed: float, k0: float,
                         rho: float = 1000.0, order: int = 1,
-                        kernel_refine: float = 1.0) -> float:
-    """Wave resistance by integrating the linearised pressure over the wetted hull.
+                        kernel_refine: float = 1.0, linear_only: bool = False,
+                        gradient: np.ndarray | None = None) -> float:
+    """Wave resistance by integrating the Bernoulli pressure over the wetted hull.
 
     Steady Bernoulli with Phi = -u x + phi gives, dropping the constant,
 
         p = rho u phi_x - rho g z - (1/2) rho |grad phi|^2 .
 
     The hydrostatic term carries no x-force: over the wetted surface closed by the z = 0
-    waterplane, the divergence theorem gives the integral of z n_x as zero, and the lid
-    itself sits at z = 0.  The quadratic term is one order higher in slenderness than
-    u phi_x, so linear theory drops it.
+    waterplane the divergence theorem gives the integral of z n_x as zero, and the lid sits
+    at z = 0.  Measured on a Sysser 01 mesh it comes to 6e-5 of its own scale, so the mesh
+    honours the identity.
 
-    Pressure acts against the outward normal, so the force on the body is minus the
-    integral of p n dS with n the into-the-fluid normal used throughout.  The body advances
-    in +x while the onset flow runs in -x, so the resistance is minus that x-force and the
-    two signs cancel:
+    Pressure acts against the outward normal, so the force on the body is minus the integral
+    of p n dS with n the into-the-fluid normal used throughout.  The body advances in +x
+    while the onset flow runs in -x, so the resistance is minus that x-force and the two
+    signs cancel:
 
-        R_w = + rho u * integral over S of phi_x n_x dS .
+        R_w = integral over S of [ rho u phi_x - (1/2) rho |grad phi|^2 ] n_x dS .
 
-    Getting this sign wrong is not subtle in its effect but is easy to do, and it was: the
-    first version returned the correct magnitude with the opposite sign, which the Wigley
-    oracle caught at once.
+    **The quadratic term is not optional.**  It is smaller than u phi_x by one order in
+    slenderness, so it is negligible for a thin hull and *not* for anything else: on a thin
+    Wigley hull at B/L = 0.02 keeping only the linear term reproduced the Michell oracle to
+    4 per cent, but on a submerged sphere, where |grad phi| is O(u) on the body, it left the
+    pressure route 68 per cent below the far-field value, and on Sysser 01 a factor of three
+    below.  Dropping it was the first version's error, and the thin-hull oracle could not
+    see it.  ``linear_only=True`` reproduces that version for comparison.
 
-    This is an *independent* discrete estimator of the same quantity the far-field integral
-    returns, not a rearrangement of it: it uses on-hull velocities where the far-field route
-    uses only the source strengths.  Agreement is therefore a real check (V11), and the two
-    converge at different rates, so they are compared with a tolerance rather than equated.
+    Two sign conventions had to be got right here and only the second was obvious: the
+    pressure acts against the outward normal, and the resistance opposes the motion.  The
+    first version had the product of the two inverted, returning the correct magnitude with
+    the wrong sign, which the Wigley oracle caught at once.
+
+    ``gradient`` accepts a matrix from :func:`velocity_matrix` so that several densities, or
+    the linear and full forms, share one assembly; it is the expensive part.
     """
-    phi_x = x_velocity_matrix(mesh, k0, order=order, kernel_refine=kernel_refine) @ sigma
-    return float(rho * speed * np.sum(phi_x * mesh.unit_normals()[:, 0] * mesh.areas()))
+    grad = (velocity_matrix(mesh, k0, order=order, kernel_refine=kernel_refine)
+            if gradient is None else gradient)
+    velocity = np.einsum("nmi,m->ni", grad, sigma)
+    normal_x = mesh.unit_normals()[:, 0]
+    area = mesh.areas()
+    integrand = rho * speed * velocity[:, 0]
+    if not linear_only:
+        integrand -= 0.5 * rho * np.einsum("ni,ni->n", velocity, velocity)
+    return float(np.sum(integrand * normal_x * area))
 
 
 def _body_condition_residual(mesh: TriMesh, sigma: np.ndarray, k0: float, speed: float,
@@ -321,7 +341,8 @@ def _body_condition_residual(mesh: TriMesh, sigma: np.ndarray, k0: float, speed:
 def solve_nk(mesh: TriMesh, speed: float, length: float, rho: float = 1000.0,
              gravity: float = 9.80665, order: int = 1, spectrum_order: int = 4,
              rtol: float = 1e-4, check_points: int = 48,
-             max_condition: float = 1e8, kernel_refine: float = 1.0) -> NKResult:
+             max_condition: float = 1e8, kernel_refine: float = 1.0,
+             lambda_cap: float | None = None) -> NKResult:
     """Solve the Neumann-Kelvin problem on a mesh and report the wave resistance."""
     k0 = gravity / speed ** 2
     a = influence_matrix(mesh, k0, wave=True, order=order, kernel_refine=kernel_refine)
@@ -341,7 +362,7 @@ def solve_nk(mesh: TriMesh, speed: float, length: float, rho: float = 1000.0,
     pts, w = panel_quadrature(mesh, spectrum_order)
     integral, diag = wave_resistance_integral(
         pts.reshape(-1, 3), (w * sigma[:, None]).reshape(-1), k0, length,
-        rtol=rtol, return_diagnostics=True)
+        rtol=rtol, lambda_cap=lambda_cap, return_diagnostics=True)
     resistance = resistance_constant(rho, gravity, speed) * integral
 
     rms, worst = _body_condition_residual(mesh, sigma, k0, speed, n_check=check_points,
@@ -361,11 +382,18 @@ def solve_nk(mesh: TriMesh, speed: float, length: float, rho: float = 1000.0,
                      "raise `order` and compare to bound that choice")
     if not diag["converged"]:
         notes.append("the wave-resistance integral did not certify its tail")
+    if diag.get("capped") and diag.get("beyond_cap", 0.0) > 0.02 * max(integral, 1e-30):
+        share = diag["beyond_cap"] / (integral + diag["beyond_cap"])
+        notes.append(f"{share:.0%} of the spectrum lies beyond lambda = "
+                     f"{diag['lambda_cap']:.2f}, which this mesh cannot resolve, and is "
+                     "excluded from the reported resistance")
     return NKResult(
         sigma=sigma, resistance=resistance, speed=speed,
         froude=speed / np.sqrt(gravity * length), k0=k0, n_panels=mesh.n_faces,
         condition_number=condition,
         body_residual_rms=rms, body_residual_max=worst,
         spectrum_blocks=int(diag["blocks"]), lambda_reached=float(diag["lambda_reached"]),
-        spectrum_converged=bool(diag["converged"]), net_source_flux=flux, notes=notes,
+        spectrum_converged=bool(diag["converged"]),
+        lambda_cap=float(diag.get("lambda_cap", float("inf"))),
+        net_source_flux=flux, notes=notes,
     )
