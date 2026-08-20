@@ -1,284 +1,125 @@
-# Wave resistance
+# wave-resistance
 
-`wave-resistance` is a transparent low-order implementation of Michell's
-thin-ship theory for the steady wave-making resistance of a displacement
-vessel in deep, calm water. It accepts a tensor-product hull-offset surface,
-computes a resistance curve over Froude number, and reports numerical and
-validity diagnostics alongside every result.
+Wave resistance of a bare sailing-yacht canoe body, computed by a Neumann–Kelvin panel
+method, with the Delft Systematic Yacht Hull Series (DSYHS) hull Sysser 01 as the worked
+case.
 
-The package predicts the **wave-making component only**. It is not a total
-resistance or powering model: skin friction, viscous pressure drag,
-appendages, air drag, roughness and propulsion are outside its scope.
+## Scope
 
-With every coordinate divided by the same reference length, the implemented
-amplitude and resistance are
+The model is steady, deep-water, inviscid and irrotational flow, with a linearised
+free-surface condition and the exact body boundary condition applied on the actual wetted
+hull at a prescribed attitude. The output is the wave resistance of a bare canoe body.
 
-\[
-a(\lambda)=\iint Y_X e^{-\lambda^2 Z/Fn^2}
-e^{-i\lambda X/Fn^2}\,dX\,dZ,
-\qquad
-I=\int_0^\infty\sqrt{1+t^2}\,
-|a(\sqrt{1+t^2})|^2\,dt,
-\]
+The following are outside the model, and no attempt is made to report them: viscous and
+form resistance; circulation, lift, leeway, appendages and induced resistance, none of
+which a source-only hull representation carries; nonlinear free-surface effects; dynamic
+sinkage and trim as a solved equilibrium; and finite depth.
 
-\[
-R_W=\frac{4\rho gL^3}{\pi Fn^2}I,
-\qquad
-C_{R_w}=\frac{8I}{\pi Fn^4(S/L^2)}.
-\]
+Geometry is held as a full hull. A half model is mirrored once, on loading, and the fact
+that it was mirrored is recorded; no code downstream of that assumes port and starboard
+symmetry.
 
-The cell integrals are analytic for the bilinear offset interpolant; only the
-outer improper integral is evaluated numerically.
+## Status
 
-Theory references: J. H. Michell, [*The wave-resistance of a
-ship*](https://doi.org/10.1080/14786449808621111), and Dambrine, Pierre and
-Rousseaux, [*A theoretical and numerical determination of optimal ship forms
-based on Michell's wave resistance*](https://www.numdam.org/item/10.1051/cocv/2014067.pdf).
+Milestone M0, the geometry and hydrostatics layer, is complete and verified. The
+Neumann–Kelvin solver is not yet implemented: the integral equation, its jump term, the
+waterline term and the far-field amplitudes are derived and verified in M1 before any
+solver code is written, because writing those constants from memory is how they come out
+quietly wrong. Milestones are listed in `docs/`.
 
 ## Installation
 
-Python 3.9 or later and NumPy are required.
-
-```bash
-python -m pip install -e .
+```
+pip install -e ".[test]"
+pytest -q
 ```
 
-Install plotting and test dependencies when needed:
+Requirements are Python 3.10 or later, NumPy and SciPy.
 
-```bash
-python -m pip install -e '.[plot,test]'
+## Use
+
+```
+wave-resistance info data/SYSSER01_surface.igs
+wave-resistance hydrostatics data/SYSSER01_surface.igs --displacement 0.0376136 --compare
+wave-resistance hydrostatics data/SYSSER01_surface.igs --draught 0.127 --heel 20 --trim 0.5
 ```
 
-## Quick start
+The reference condition is set either by a target displaced volume, for which the code
+solves the flotation datum, or by an explicit draught. Prescribed sinkage, trim and heel
+are offsets from that reference condition; they are not solved for.
 
-```python
-import numpy as np
+## What has been verified
 
-from wave_resistance import MichellSolver, wigley_hull
+Every figure below is produced by the test suite.
 
-hull = wigley_hull(length_m=4.0, nx=161, nz=65)
-fn = np.linspace(0.15, 0.45, 61)
-result = MichellSolver().solve(hull, fn)
+The four independent routes to the displaced volume, from the divergence theorem applied
+with the fields $(0,y,0)$, $(x,0,0)$, $(0,0,z)$ and $\bm{r}/3$, agree to
+3 parts in 10^15 on Sysser 01. With the free surface at $z=0$ the waterplane lid
+contributes nothing to any of them, so no lid is constructed.
 
-print(result.c_wave_resistance)
-print(result.wave_resistance_N)
-print(result.converged)
-print(result.validity_flags)
-result.to_csv("wigley_results.csv")
-```
+Hydrostatics of the analytic Wigley hull converge to the closed-form values at second
+order, the error falling by a factor of four for each halving of the mesh: the relative
+error in displaced volume is 5.0 × 10^-5, 1.3 × 10^-5 and 3.1 × 10^-6 on successively
+refined meshes. Waterline length, beam and draught are recovered exactly. For a
+rectangular box every hydrostatic quantity is exact to 1 part in 10^12.
 
-`WaveResistanceResult` contains, point by point:
+On Sysser 01 the same second-order behaviour holds, with successive-difference ratios of
+3.99 for displaced volume and for the longitudinal centre of buoyancy. Richardson
+extrapolation of the sequence gives a displaced volume of 0.0376265 m^3, a wetted area of
+0.6561380 m^2 and a waterplane area of 0.5584200 m^2.
 
-- `fn`, `speed_m_s`, `wave_resistance_N` and `c_wave_resistance`;
-- the nondimensional Michell `integral`;
-- `quadrature_error`, `tail_fraction` and `cancellation_ratio` diagnostics;
-- `converged` and human-readable `validity_flags`;
-- optional `spectral_density` when `include_spectrum=True`.
+Surface evaluation is checked against B-spline identities and, for the derivatives,
+against the derivative patch constructed independently from differences of control
+points, which agrees to 1 part in 10^11. The Wigley Michell amplitude is checked against
+direct quadrature of its defining integrals over nine decades of argument, including the
+crossovers into the Taylor series that replace the closed forms where cancellation would
+otherwise dominate; the worst relative error is 1.5 × 10^-13.
 
-The coefficient is
+Plane sections classify vertices lying on the cut plane explicitly. This matters rather
+than being a nicety: with a strict inequality, a cut through the pole meridians of a
+tessellated sphere came out 3.4 × 10^-3 low in area, against 6.4 × 10^-5 for the same cut
+displaced off the vertices. Waterplanes and station cuts land on mesh vertices routinely.
 
-\[
-C_W=\frac{R_W}{\tfrac12\rho U^2 S},
-\qquad Fn=\frac{U}{\sqrt{gL}},
-\]
+## The Sysser 01 reference condition
 
-where `L` is the hull metadata reference length and `S` its static wetted
-surface area. SI units are used throughout.
+Matching the published displaced volume of 0.0376136 m^3 at zero trim recovers the
+published canoe-body draught of 0.127040 m to within 0.058 %, and the published
+waterplane area to within 0.053 %, although neither was a target of the solve.
 
-## Hull geometry
+Three quantities do not reconcile: waterline length is 0.51 % high, waterline beam 1.11 %
+high and wetted area 2.10 % high. Attitude does not account for this. Solving heave and
+trim together to match the published volume and longitudinal centre of buoyancy converges
+to a bow-up trim of 0.5704°, and matches both targets, but increases every one of those
+three discrepancies.
 
-`OffsetHull` represents half-breadths `y(x,z)` on a tensor grid. Coordinates
-use `x=0` at the aft end, `x=L` at the forward end, and positive `z` downward
-from the undisturbed waterplane. Geometry constructors validate ordering,
-coverage, finite values and metadata before a solve.
+The published table is internally consistent on its own numbers, so it describes a real
+hull. The most likely explanation lies in the provenance of the supplied file, whose
+header path reads "Rhino modellen na inmeten 2012", i.e. Rhino models after measuring,
+2012, and whose surface is named "Gerebuild oppervlak", i.e. reconstructed surface. The
+file is a re-measurement of the physical model made in 2012, whereas the published
+hydrostatics may derive from the original 1981 lines. Wetted area is the quantity most
+sensitive to local surface fairness, and it shows the largest discrepancy. Milestone M4
+resolves this against the primary release; until then the discrepancy is carried as a
+stated bias, not assumed away.
 
-The built-in canonical hull is
+## Data
 
-```python
-from wave_resistance import wigley_hull
+`data/SYSSER01_surface.igs` is a DSYHS geometry file. The primary releases are the
+[geometries](https://figshare.com/articles/dataset/Delft_Systematic_Yacht_Hull_Series_Geometries_data/21501330),
+the [hydrostatics](https://data.4tu.nl/articles/dataset/Delft_Systematic_Yacht_Hull_Series_hydrostatics_data/21501375)
+and the [measurements](https://data.4tu.nl/articles/dataset/Delft_Systematic_Yacht_Hull_Series_Measurement_Data/21501402),
+all published by Delft University of Technology. Users redistributing this file should
+satisfy themselves that the terms of those releases permit it.
 
-hull = wigley_hull(
-    length_m=4.0,
-    beam_m=0.4,       # optional; default L/10
-    draft_m=0.25,     # optional; default B/1.6
-    nx=161,
-    nz=65,
-)
-print(hull.diagnostics)
-```
+Published reference values live in editable data files under
+`src/wave_resistance/data/`, each recording its source and any unresolved ambiguity, so
+that a figure can be corrected against a primary source without touching code.
 
-Its half-breadth is the parabolic Wigley form
+## References
 
-\[
-y=\frac{B}{2}\left[1-\left(\frac{2x}{L}-1\right)^2\right]
-  \left[1-\left(\frac{z}{T}\right)^2\right].
-\]
-
-`OffsetHull.from_csv`, `OffsetHull.from_json` and
-`OffsetHull.from_irregular` support user-supplied offsets; see their
-docstrings for the schema and interpolation rules.
-
-The canonical long-form CSV is:
-
-```text
-x_m,z_m,half_breadth_m
-0.0,0.0,0.0
-...
-```
-
-It is accompanied by a JSON file containing:
-
-```json
-{
-  "schema_version": "1.0",
-  "name": "Example hull",
-  "length_ref_m": 4.0,
-  "length_ref_kind": "LWL",
-  "wetted_area_m2": 2.38
-}
-```
-
-Load both with `OffsetHull.from_csv("offsets.csv", "metadata.json")`.
-
-## Physical and numerical limits
-
-Michell theory assumes a slender hull, small disturbance, steady forward
-motion, inviscid irrotational flow, a linear free surface and effectively
-deep water. The present hull is fixed at its input waterline and attitude.
-The model does not resolve dynamic sinkage and trim, transom separation,
-spray, breaking waves or finite-depth effects.
-
-The default declared envelope is `0.10 <= Fn <= 0.45`. Results outside the
-envelope are rejected unless explicitly enabled in `SolverSettings`; enabled
-out-of-envelope results remain flagged. A converged quadrature is not evidence
-that the physical assumptions are valid, so inspect both `converged` and
-`validity_flags`.
-
-## Validation without semantic shortcuts
-
-Towing-tank publications report several distinct resistance quantities.
-`wave_resistance.validation` keeps them separate:
-
-| `ResistanceQuantity` | Meaning | Symbol |
-|---|---|---|
-| `TOTAL` | measured total resistance | `C_T` |
-| `RESIDUARY` | `C_T - (1+k) C_F` | `C_R` |
-| `WAVE_MAKING` | wave-making force | `C_W` |
-| `WAVE_PATTERN` | far-field wave-analysis result | `C_WP` |
-
-It also records the experimental attitude:
-
-| `HullAttitude` | ITTC code | Meaning |
-|---|---|---|
-| `FIXED` | `FX` | sinkage and trim fixed |
-| `FREE_SINKAGE` | `FS` | free to sink only |
-| `FREE_SINKAGE_TRIM` | `FR` | free to sink and trim |
-
-These categories are not silently converted. In particular, `C_R` is not
-assumed to equal `C_W`, and a fixed Michell prediction cannot be scored
-against a free-running experiment. `C_WP` is also not used as an automatic
-proxy for `C_W`. This prevents a numerically precise but physically invalid
-score.
-
-Load a header-based experimental CSV and compare it with a result:
-
-```text
-fn,value,quantity,uncertainty,attitude,source
-0.20,0.00070,wave_making,0.00002,fixed,Tank A
-0.30,0.00120,wave_making,0.00003,fixed,Tank A
-```
-
-```python
-from wave_resistance.validation import (
-    HullAttitude,
-    ResistanceQuantity,
-    ValidationSeries,
-)
-
-observed = ValidationSeries.from_csv(
-    "wigley_cw.csv"
-)
-
-predicted = ValidationSeries(
-    result.fn,
-    result.c_wave_resistance,
-    quantity=ResistanceQuantity.WAVE_MAKING,
-    attitude=HullAttitude.FIXED,
-    label="Michell model",
-)
-
-report = observed.compare(predicted)
-print(report.to_text())
-print(report.metrics.as_dict())
-```
-
-Predictions are linearly interpolated to the measured Froude numbers but are
-never extrapolated. Curve metrics use trapezoidal Froude-number weights:
-
-\[
-E_2=\left[\frac{\sum_i w_i(C_i^{model}-C_i^{exp})^2}
-{\sum_i w_i(C_i^{exp})^2}\right]^{1/2}.
-\]
-
-The report also gives signed bias and mean absolute error in drag counts
-(`1 count = 10^-4` in coefficient), maximum absolute error and its Froude
-number, and location errors for the dominant interior hump and hollow. A
-relative pointwise percentage error is intentionally omitted because it is
-ill-conditioned near wave-resistance hollows.
-
-## Plotting example
-
-The same workflow is available interactively in
-[`examples/wigley_curve.ipynb`](examples/wigley_curve.ipynb).
-The repository also includes the verified 71-point
-[`wigley_results.csv`](examples/wigley_results.csv), its
-[`verification summary`](examples/wigley_verification.json), and the resulting
-[`curve`](examples/wigley_curve.png).
-
-```bash
-python examples/wigley_curve.py --output wigley_curve.png \
-    --result-csv wigley_results.csv
-```
-
-To overlay licensed or locally held experimental data:
-
-```bash
-python examples/wigley_curve.py --validation wigley_cw.csv \
-    --validation-column C_W --output wigley_validation.png
-```
-
-The script prints the validation report and writes the plot. Matplotlib is
-imported only by the example and is not a core dependency.
-
-## Benchmark data and provenance
-
-No experimental data are redistributed with this repository. Widely used
-legacy data are publicly readable but generally do not state an open-data
-licence; free access is not permission to repackage them. Record the facility,
-model length, reference-length definition, wetted area, Reynolds number,
-temperature, turbulence stimulation, attitude, extraction method and source
-for every imported series.
-
-Useful primary sources include:
-
-- [17th ITTC Resistance Committee report](https://ittc.info/media/2212/report-of-resistance-committee.pdf): multi-laboratory Wigley and Series 60 total, component and wave-pattern data.
-- [ITTC benchmark list](https://www.ittc.info/media/11250/list-of-benchmarks-2.pdf): Series 60, KCS, DTMB 5415 and other canonical hulls.
-- [ITTC resistance-test procedure](https://ittc.info/media/11780/75-02-02-01.pdf): coefficient definitions and test semantics.
-- [ITTC uncertainty guide](https://www.ittc.info/media/9601/75-02-02-02.pdf): resistance-test uncertainty sources and propagation.
-- [ITTC wave-pattern procedure](https://www.ittc.info/media/11790/75-02-02-04.pdf): wave-profile measurement and far-field analysis.
-
-If plotted legacy values are digitised, retain that fact in `metadata` and
-include digitisation uncertainty. Prefer fixed-attitude data for direct
-comparison with this solver. Keep complete hull families out of calibration
-when assessing cross-hull predictive performance.
-
-## Tests
-
-```bash
-python -m pytest
-```
-
-The test suite covers analytic/reference kernels, geometry ingestion,
-configuration/result contracts and validation metrics. Numerical refinement
-should be judged together with the reported quadrature and tail diagnostics,
-not solely by agreement with an experimental curve.
+The IGES reader follows the IGES 5.3 specification. Basis functions follow the Cox–de
+Boor recurrence as given by Piegl and Tiller, *The NURBS Book*. The Kelvin Green function
+is implemented in M1 from Noblesse (1981), *Alternative integral representations for the
+Green function of the theory of ship wave resistance*, and Newman (1987), *Evaluation of
+the wave-resistance Green function*. The thin-ship functional retained as an oracle is
+that of Michell (1898), *The wave-resistance of a ship*.

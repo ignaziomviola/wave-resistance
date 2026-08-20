@@ -4,24 +4,32 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "wave-resistance"
-version = "0.1.0"
-description = "Low-order Michell thin-ship wave-resistance model"
+version = "0.2.0.dev0"
+description = "Neumann-Kelvin wave resistance of a bare sailing-yacht canoe body"
 readme = "README.md"
-requires-python = ">=3.9"
-dependencies = ["numpy>=1.24"]
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.24", "scipy>=1.10"]
 authors = [{name = "Ignazio Maria Viola"}]
 classifiers = [
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.9",
   "Topic :: Scientific/Engineering :: Physics",
 ]
 
 [project.optional-dependencies]
-plot = ["matplotlib>=3.7"]
-test = ["pytest>=7", "mpmath>=1.3"]
+test = ["pytest>=7"]
+
+[project.scripts]
+wave-resistance = "wave_resistance.cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+wave_resistance = ["data/*.toml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["error::RuntimeWarning"]

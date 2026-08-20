@@ -1,0 +1,28 @@
+# Official model-scale hydrostatics for DSYHS Sysser 01 at zero heel.
+#
+# PROVENANCE.  These figures were supplied during review as the published Delft
+# values and have NOT yet been re-read from the primary release by this code.  The
+# primary sources are:
+#   geometry     https://figshare.com/articles/dataset/Delft_Systematic_Yacht_Hull_Series_Geometries_data/21501330
+#   hydrostatics https://data.4tu.nl/articles/dataset/Delft_Systematic_Yacht_Hull_Series_hydrostatics_data/21501375
+#   measurements https://data.4tu.nl/articles/dataset/Delft_Systematic_Yacht_Hull_Series_Measurement_Data/21501402
+# Milestone M4 replaces this file with values read directly from the hydrostatics
+# release, and records the LCB datum convention, which is presently unverified.
+#
+# The table is internally consistent on its own numbers: Aw/(Lwl*Bwl) = 0.68818 against
+# the quoted Cwp = 0.688296, and Am/(Bwl*Tc) = 0.64632 against the quoted Cm = 0.646410,
+# where Am follows from Cp and the displacement.  So it describes a real hull.
+
+[sysser01]
+source = "review-supplied; to be re-read from 4TU 21501375 in M4"
+heel_deg = 0.0
+lwl = 1.600000            # m
+bwl = 0.507200            # m
+tc = 0.127040             # m, canoe-body draught
+volume = 0.0376136        # m^3
+wetted_area = 0.642534    # m^2
+waterplane_area = 0.558566  # m^2
+cp = 0.564414
+cm = 0.646410
+cwp = 0.688296
+lcb = -0.036640           # m, dataset convention (datum unverified)
