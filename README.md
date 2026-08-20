@@ -22,35 +22,62 @@ symmetry.
 ## Status
 
 Milestones M0 (geometry and hydrostatics), M1 (formulation and the Kelvin Green function)
-and M2 (constant-source panels and the Rankine solver) are complete and verified. What
-remains is M3: assembling the wave kernel into the influence matrix, solving, and taking
-the resistance from the far-field amplitude.
+and M2 (constant-source panels and the Rankine solver) are complete and verified. M3, the
+full Neumann–Kelvin solve, is in progress: the influence matrix, the solve, the far-field
+resistance and an independent pressure route are implemented and verified against the
+Michell oracle, and what remains is the convergence study on Sysser 01 itself.
 
-Two results from M1 are worth stating here. First, a waterline line integral is **not**
-part of this formulation: the Green function already satisfies the free-surface condition
-at every point of z = 0, so a source-only representation never forms the integral that
-produces one. The waterline term of the Neumann–Kelvin literature belongs to the
-Green's-identity formulation. The project plan asserted otherwise, and that assertion is
-withdrawn in `docs/formulation.md`.
+Three results are worth stating here.
 
-Second, the Green function is evaluable only so close to the free surface. Relative error
-against a refined evaluation is 3e-13 at k0|z_i + z_j| = 0.5 but 2e-4 at 0.05, so the panel
-mesh must keep k0|z_i + z_j| above roughly 0.1 — at Fn = 0.3 on Sysser 01, panel centroids
-at least about 7 mm below the waterline. Nothing is missing from the formulation; the
-discretisation has to respect where the kernel can be evaluated.
+**A waterline line integral is not part of this formulation.** The Green function already
+satisfies the free-surface condition at every point of z = 0, so a source-only
+representation never forms the integral that produces one. The waterline term of the
+Neumann–Kelvin literature belongs to the Green's-identity formulation. The project plan
+asserted otherwise, and that assertion is withdrawn in `docs/formulation.md`.
 
-Throughput, measured on a real Sysser 01 pair distribution, is 928 microseconds per panel
-pair, which is 594 s of assembly for 800 panels and 2090 s for 1500. Against the 10-minute
-budget, 800 panels fits and 1500 does not.
+**The resistance constant was wrong by a factor of four, and the mistake was instructive.**
+It is fixed by the thin-ship limit, and that limit turns on which source density a thin
+hull carries. The two faces of a hull `y = ±f` coalesce onto the centreplane, so each
+carries half the sheet strength and σ → u·n_x. That is *not* the zeroth iterate
+σ = 2u·n_x of the integral equation: for a thin body the two faces' mutual influence is
+O(1), so dropping the integral operator is not the thin-ship limit. Anchoring the constant
+on the zeroth iterate gave ρg²/(4πu⁴) instead of ρg²/(πu⁴). The test that was supposed to
+catch this back-computed the constant from the oracle and divided by the shipped value, so
+it only ever checked that the two were mutually consistent; it now compares the shipped
+resistance against the oracle, which can fail.
+
+**The earlier accuracy claim for the Green function measured the wrong quantity.** It
+measured g_w; the influence matrix uses ∇g_w, whose integrand carries an extra sec²θ. At
+(X, Y, |Z|) = (2, 0.8, 0.02) the production quadrature returned g_w to 1.7e-3 and its
+gradient **185 per cent wrong**. That error put the first Sysser 01 solve at 18.5 N at
+Fn = 0.30 — five per cent of displacement weight — and it looked convincingly like the known
+waterline difficulty of the Neumann–Kelvin problem for a surface-piercing body. It was
+quadrature: a narrow peak in the integrand where Im c vanishes, a grading that equalised
+only one term of the phase, too few nodes per panel for the gradient, and a panel cap
+reached without saying so. All four are fixed and each is a test. Worst gradient error
+inside the envelope a Sysser mesh actually spans is now 7.0e-4, median 6e-11.
+
+Consequently the mesh constraint previously stated here — panel centroids at least 7 mm
+below the waterline at Fn = 0.3 — is **withdrawn**. The binding quantity is the oscillation
+count of a panel *pair*, which grows as |y_i − y_j| / |z_i + z_j| rather than with depth
+alone. It is exposed as `greens.oscillation_count`, and `nk.influence_matrix` refuses a mesh
+outside the envelope rather than returning a plausible number from a coarsened grid.
+
+Two independent routes to the resistance are implemented, and they agree. On a thin Wigley
+hull at Fn = 0.30 with 278 panels, the far-field amplitude gives 0.942 of the Michell value
+and the pressure integral 0.958, the two within 1.7 per cent of each other.
+
+Throughput is 1164 microseconds per panel pair on a real Sysser 01 mesh, against 928 before
+the kernel correction, so the fix cost 25 per cent. Against the 10-minute assembly budget
+that caps the mesh at about 700 panels.
 
 Panel influences integrate the kernel over the whole panel; centroid value times area is
-used nowhere. The sphere in an unbounded stream recovers the analytically derived density
-1.5 u n_x, at first order in panel size with a Richardson extrapolant of 1.5008. First
-order is the correct expectation for a piecewise-constant density, and the plan's
-second-order criterion for that test was mistaken; imposing the exact density instead shows
-the geometry and potential evaluation are second order, as they should be.
+used nowhere for the Rankine part. The sphere in an unbounded stream recovers the
+analytically derived density 1.5 u n_x, at first order in panel size with a Richardson
+extrapolant of 1.5008. First order is the correct expectation for a piecewise-constant
+density, and the plan's second-order criterion for that test was mistaken.
 
-The derivation, every verification and the six silent errors found along the way are in
+The derivation, every verification and the errors found along the way are in
 `docs/formulation.md`; milestones are in `docs/plan.md`.
 
 ## Installation

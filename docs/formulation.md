@@ -167,18 +167,45 @@ $$R_W = C \int_1^\infty \tfrac{1}{2}\left(|A_+|^2 + |A_-|^2\right)
 which reduces to $C\int |A|^2 \lambda^2(\lambda^2-1)^{-1/2}\mathrm{d}\lambda$ when
 $A_- = A_+^*$, i.e. for a hull symmetric about $y=0$ at zero heel.
 
-**The constant $C$ is fixed by verification, not asserted here.** It is determined by
-requiring that the closure $\sigma = u\,n_x$, which is (3.2) with the integral term
-dropped and hence the Hogner or zeroth-order slender-ship approximation, reproduce on a
-thin symmetric hull the Michell value already verified independently in this repository:
-$10^3 C_W = 2.1413$ at $Fn = 0.300$ and $1.2362$ at $Fn = 0.345$ for the Wigley hull with
-$B/L = 0.1$ and $T/L = 0.0625$. That is test V2.
+The constant $C$ follows from the thin-ship limit, and the derivation turns entirely on
+which source density a thin hull carries. For a hull $y = \pm f(x,z)$ the two faces
+coalesce onto $y = 0$. The linearised body condition on the starboard face is
+$\varphi_y = -u f_x$, and a centreplane sheet of strength $m$ produces
+$\varphi_y = \pm m/2$ at $y = 0^\pm$, so $m = -2u f_x$. Each of the two faces carries its
+own density $\sigma$ and the two add on coalescence, so $2\sigma = m$ and
 
-Two cautions on that closure. First, $\sigma = u\,n_x$ being the zeroth iterate of (3.2)
-is a statement about this particular kernel convention, normal orientation and jump
-coefficient; it is used only to pin $C$. Second, agreement of the zeroth iterate with
-Michell tests normalisation alone. It exercises neither the Kelvin influence matrix nor
-the solve, so it is not a validation of the method, and it is not reported as one.
+$$\sigma \to u\,n_x , \qquad n_x = -f_x \ \text{on the starboard face} . \tag{4.4}$$
+
+This is emphatically **not** the zeroth iterate of (3.2), which is $\sigma = 2u\,n_x$
+(§11). For a thin body the two faces are a distance $2f \to 0$ apart, so their mutual
+influence through the integral operator is $O(1)$, not small; dropping that operator is
+therefore not the thin-ship limit. Conflating the two is what produced an error of exactly
+four in an earlier version of this document.
+
+With (4.4) and $n_x\,\mathrm{d}S = -f_x\,\mathrm{d}x\,\mathrm{d}z$ per face, (4.2) becomes
+$A \to -2u\,A_M$, where $A_M = L^2 a(\lambda)$ is Michell's amplitude in the
+nondimensional form already verified in this repository. Hence
+$|A|^2 \to 4u^2|A_M|^2$, and matching (4.3) to Michell's
+
+$$R_W = \frac{4\rho g^2}{\pi u^2}\int_1^\infty |A_M|^2
+\frac{\lambda^2}{\sqrt{\lambda^2-1}}\,\mathrm{d}\lambda \tag{4.5}$$
+
+gives $4u^2 C = 4\rho g^2/(\pi u^2)$, so
+
+$$C = \frac{\rho g^2}{\pi u^4} . \tag{4.6}$$
+
+Michell's prefactor in (4.5) is itself anchored on published Wigley values reproduced
+independently here, $10^3 C_W = 2.1413$ at $Fn = 0.300$ and $1.2362$ at $Fn = 0.345$ for
+$B/L = 0.1$, $T/L = 0.0625$.
+
+Test V2 checks (4.6) in two separate ways. Imposing (4.4) analytically and pushing it
+through the far-field integral isolates the constant and the kernel from the linear solve;
+it reproduces Michell to 0.12 % at 1630 panels and 0.84 % at 558 panels for $B/L = 0.02$,
+$Fn = 0.30$, and converges under refinement at $Fn = 0.30$ and $0.40$ and at $B/L = 0.02$
+and $0.005$. Separately, the full NK solve on thin Wigley hulls returns
+$R_W/R_W^{\text{Michell}} = 1.036$ and $0.942$ at 158 and 278 panels, bracketing unity
+with the first-order error in $\sigma$ that §11 quantifies. The first check verifies the
+normalisation; only the second exercises the Kelvin influence matrix and the solve.
 
 ## 5. What the model does not contain
 
@@ -269,13 +296,15 @@ far. Relative error against a heavily refined evaluation, at the production sett
 |---|---|---|---|---|---|---|---|---|
 | relative error | 2e-15 | 6e-13 | 3e-13 | 1e-9 | 2e-7 | 2e-4 | 1e-3 | 1e-1 |
 
-**Consequence for the discretisation.** The NK mesh must keep $k_0|z_i + z_j| \gtrsim 0.1$.
-At $Fn = 0.3$ on Sysser 01, where $k_0 = 6.9$ per metre, that means panel centroids at
-least about 7 mm below the waterline, against a canoe-body draught of 127 mm. A uniform
-mesh with few girth divisions puts the top row closer than that, so the NK mesh needs
-grading away from the waterline. This is the concrete form taken by the caveat of
-section 3: nothing is missing from the formulation, but the discretisation has to respect
-where the kernel is evaluable.
+**Consequence for the discretisation — superseded by section 15.** This table led to the
+constraint $k_0|z_i + z_j| \gtrsim 0.1$, i.e. panel centroids about 7 mm below the waterline
+at $Fn = 0.3$ on Sysser 01. That constraint is **withdrawn**, for two reasons. It was
+derived from the accuracy of $g_w$, but the influence matrix uses $\nabla g_w$, which was
+far less accurate than this table suggests; and once the gradient is fixed, the binding
+quantity is the oscillation count of the *pair*, which depends on $|Y|/|Z|$ rather than on
+$|Z|$ alone. Section 15 replaces both the measurement and the constraint. The numbers above
+are kept because they are correct for $g_w$, and because mistaking them for a statement
+about the gradient is the error that section 15 records.
 
 ## 10. Throughput
 
@@ -292,15 +321,30 @@ a banded Horner evaluation, which cut the per-node cost from 2030 ns to 274 ns. 
 comparison, `scipy.special.exp1` on complex argument costs 1423 ns per element, which is
 why the asymptotic path carrying 76 per cent of nodes matters so much.
 
-## 11. The zeroth iterate
+## 11. The zeroth iterate is not the thin-ship limit
 
 Dropping the integral term from (3.2) leaves $\tfrac{1}{2}\sigma = u\,n_x$, so the zeroth
 iterate of this integral equation is $\sigma = 2u\,n_x$ in this kernel convention. Whether
 that coincides with Hogner's distribution depends on his normalisation, which is not
-reproduced here, so the quantity is used only as a probe for fixing the constant $C$ of
-(4.3) and is not presented as a named method. As section 4 already noted, agreement of a
-zeroth iterate with Michell tests normalisation alone: it exercises neither the Kelvin
-influence matrix nor the solve.
+reproduced here, so it is not presented as a named method.
+
+It is also **not** the thin-ship density, which §4 derives as $\sigma = u\,n_x$. The two
+differ by a factor of two and the resistance by a factor of four. An earlier version of
+this document used the zeroth iterate to pin $C$ and so reported
+$C = \rho g^2/(4\pi u^4)$, a fourfold error. The zeroth iterate is legitimate as a probe
+of the far-field kernel with the solve switched off, and nothing more; the constant is now
+pinned by the derivation of §4, checked twice as described there.
+
+The solved density confirms the derivation directly. On Wigley hulls at $Fn = 0.30$,
+$T/L = 0.0625$, the mean of $\sigma/(u\,n_x)$ over panels with $|n_x| > 0.02$ is
+
+| $B/L$ | 0.10 | 0.05 | 0.02 (158 panels) | 0.02 (278 panels) |
+|---|---|---|---|---|
+| mean $\sigma/(u\,n_x)$ | 1.028 | 1.086 | 1.077 | 1.037 |
+
+which sits near unity, not near two. Piecewise-constant collocation is first order in the
+density (§14), so a few per cent of scatter at these panel counts is expected; a factor of
+two is not.
 
 ## 12. Errors found while verifying, all of which produced plausible wrong answers
 
@@ -394,3 +438,94 @@ $\tfrac{3}{2}u\,n_x$ on the faceted sphere and evaluating the exterior potential
 errors of 1.27e-1, 3.38e-2 and 8.61e-3 against the analytic dipole — clean second order.
 So the geometry and the potential evaluation are second-order accurate, and the first-order
 behaviour belongs to the piecewise-constant density alone.
+
+---
+
+# M3 results: the full Neumann–Kelvin solve
+
+## 15. Five errors in the wave-kernel quadrature, all of which the value hid
+
+Section 9 measured the accuracy of $g_w$ and set the mesh constraint from it. That was the
+wrong quantity. The influence matrix uses $\nabla g_w$, and the gradient integrand carries
+an extra factor of $\sec^2\theta$ — $\mathrm{d}c/\mathrm{d}Z = -\sec^2\theta$ and
+$\mathrm{d}c/\mathrm{d}Y = -\mathrm{i}\sec^2\theta\sin\theta$ — so it weights the fast end
+of the wave-angle range far more heavily than the value does. Measured against a heavily
+refined evaluation, at $(X, Y, |Z|) = (2, 0.8, 0.02)$ the production grid returned $g_w$ to
+1.7e-3 and its gradient **185 per cent wrong**.
+
+That error was silent, it converged under `refine`, and it propagated straight into the
+resistance: the first Sysser 01 solve returned 18.5 N at $Fn = 0.30$, five per cent of
+displacement weight, with the shallowest 3.4 per cent of the wetted area carrying 62 per
+cent of the resistance and $\sigma/u$ reaching $-3.2$ against a deep-water maximum of 1.3.
+It is tempting to read that as the known waterline difficulty of the Neumann–Kelvin problem
+for a surface-piercing body. It was not. It was quadrature.
+
+Four distinct causes, each found by ablation rather than by inspection:
+
+1. **A narrow peak with nothing to resolve it.** $\operatorname{Im} c$ vanishes where
+   $\tan\theta = -X/Y$, and there $|c| = \sec^2\theta\,|Z|$ takes its minimum over the
+   range. The value integrand has only a logarithm there; the gradient carries $-1/c$, so
+   it has a peak of height $O(1/|Z|)$ and width $O(|Z|)$. At $(2, 0.8, 0.02)$ that width is
+   1.6e-3 in the normalised variable against a panel width of 0.025. The peak narrows in
+   proportion to $|Z|$, so **uniform refinement cannot fix it** — reaching 1e-8 took about
+   eight times the production node count. The remedy is local: the panel containing the
+   peak is replaced, per point, by a partition graded towards it by successive halving,
+   which is parameter-free and needs no estimate of the width. Twelve halvings resolve any
+   width down to the panel over $2^{12}$. Because the replacement adds a *fixed* number of
+   nodes per point, the calculation stays rectangular and vectorised.
+   $Y = 0$ puts the peak at $\theta = \pm\pi/2$, outside the range, which is why the
+   production grid was exact to machine precision along $Y = 0$ at every $|Z|$ and wrong
+   off it. That asymmetry is what identified the mechanism.
+2. **A grading that equalised one term of the phase.** The phase over the inner range is
+   $c_q\xi^2 + c_l\xi$ cycles, with $c_q = \text{reach}\,|Y|/(2\pi|Z|)$ and
+   $c_l = |X|t_{\max}/(2\pi)$. The grid was uniform in $\xi^2$, which equalises the
+   quadratic term exactly, plus a short stretch uniform in $\xi$ — a "core" — for the
+   linear term. The split between them was the fixed constant 0.15. Whenever the two terms
+   were comparable the core covered a stretch that was overwhelmingly quadratic while
+   grading it uniformly, and its outer panels carried several times the per-panel budget.
+   At $(0.5, 2, 0.01)$ the gradient was 8.5e-4 wrong and needed four times the core
+   panels; at $(0.5, 6, 0.02)$ the $\partial/\partial Z$ component was 16 per cent wrong.
+   Both are now exact by construction: the whole phase is inverted in one expression,
+   $$\xi_j = \frac{-c_l + \sqrt{c_l^2 + 4c_q\,j\,(c_q+c_l)/n}}{2c_q}, \tag{15.1}$$
+   so every panel carries exactly $(c_q+c_l)/n$ cycles and there is no core and no split.
+3. **Too few nodes per panel for the gradient.** With the grading fixed, raising the
+   Gauss–Legendre order from 12 to 16 cut the worst gradient error inside the Sysser
+   envelope from 7.5e-3 to 7.0e-4 for 23 per cent more nodes, while raising the *panel*
+   count eightfold reached only 7e-3. Order, not panel count, was the binding knob — the
+   signature of an integrand whose amplitude varies strongly within a panel.
+4. **A panel cap reached without saying so.** The grid is capped at 16 000 panels, so
+   beyond $16\,000 \times 1.5 = 24\,000$ cycles the per-panel budget is silently exceeded.
+   At $(8, 6, 0.005)$, 7750 cycles, `refine` above 4 changed nothing because every setting
+   was clamped, and the "reference" was itself unconverged. This is now an explicit
+   envelope: `greens.oscillation_count` returns the count, `greens.envelope_ok` tests it,
+   and `nk.influence_matrix` **raises** rather than returning a plausible number.
+
+The cheapest lever turned out to be the one not previously questioned. `_DAMPING_REACH`
+sets $t_{\max} = \sqrt{\text{reach}/|Z| - 1}$ and so the cycle count, and hence the cost,
+linearly. It was 40, putting the free-wave truncation at $\mathrm{e}^{-40}$, below double
+precision. Cutting it to 25 puts the floor at $\mathrm{e}^{-25} = 1.4$e-11 — which is
+where the measured median error now sits, so the floor is a stated truncation rather than
+an unnoticed deficiency — and pays for the higher order.
+
+**Accuracy now.** Inside the envelope a Sysser 01 mesh at $Fn = 0.30$ actually spans
+($|X| \le 11.1$, $|Y| \le 3.5$, topmost centroid 1 mm below the surface so
+$|Z| \ge 0.0139$), over 400 randomly drawn panel pairs:
+
+| | worst | median |
+|---|---|---|
+| $\nabla g_w$ | 7.0e-4 | 6e-11 |
+| $g_w$ | 1.1e-5 | — |
+
+against 1.85 for the worst gradient before. Throughput on an actual 280-panel Sysser mesh
+is **1164 microseconds per panel pair**, against 928 before, so the whole correction cost
+25 per cent. That gives 745 s of assembly at $N = 800$ and 570 s at $N = 700$, so the
+plan's 10-minute budget per speed caps the mesh at about 700 panels.
+
+**Section 9's mesh constraint is withdrawn.** It required
+$k_0|z_i + z_j| \gtrsim 0.1$, from the accuracy of $g_w$. The binding constraint is the
+oscillation count of the *pair*,
+$$\text{cycles} = \frac{1}{2\pi}\left[\frac{\text{reach}\,|Y|}{|Z|}
+ + |X|\,t_{\max}\right] \le 24\,000 , \tag{15.2}$$
+which depends on $|Y|/|Z|$ and not on $|Z|$ alone. A Sysser 01 mesh at $Fn = 0.30$ with its
+topmost centroid 1 mm down reaches 1699 cycles — comfortably inside — where the old
+constraint would have demanded 7 mm and a mesh that cannot be built near the bow and stern.

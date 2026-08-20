@@ -33,3 +33,6 @@ wave_resistance = ["data/*.toml"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 filterwarnings = ["error::RuntimeWarning"]
+markers = [
+  "slow: needs a Kelvin influence matrix and a linear solve; minutes, not seconds",
+]

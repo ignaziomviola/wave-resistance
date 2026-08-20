@@ -12,8 +12,11 @@ from scipy.special import exp1
 
 from wave_resistance import greens
 from wave_resistance.greens import (
-    RADIATION_SIGN, calibrate_radiation_sign, green, p_function, q_function,
-    rankine_part, wave_part,
+    RADIATION_SIGN, _DAMPING_REACH, _normalised_grid, _peak_position, _peak_refined,
+    _phase_edges, _theta_of_xi_2d, MAX_CYCLES, calibrate_radiation_sign,
+    envelope_ok, green,
+    oscillation_count, p_function, q_function, rankine_part, wave_part,
+    wave_part_gradient,
 )
 
 #: g_w at three points, from the raw double integral with Rayleigh damping evaluated by
@@ -203,19 +206,87 @@ def test_green_function_satisfies_the_linearised_free_surface_condition(px, py):
     assert abs(float(gxx + k0 * gz)) < 1e-4 * max(abs(float(gxx)), 1.0)
 
 
-def test_accuracy_degrades_only_near_the_free_surface():
-    """Quantifies the constraint the discretisation has to respect.
+def test_the_gradient_is_as_accurate_as_the_value_near_the_free_surface():
+    """The regression test for the errors of ``docs/formulation.md`` section 15.
 
-    g_w diverges logarithmically as Z -> 0, and the quadrature follows it down only so
-    far.  Measured relative error against a heavily refined evaluation, at the production
-    setting: 2e-15 at |Z| = 2, 3e-13 at 0.5, 1e-9 at 0.2, 2e-7 at 0.1, 2e-4 at 0.05,
-    1e-1 at 0.005.  So an NK mesh must keep k0 |z_i + z_j| above roughly 0.1, which at
-    Fn = 0.3 on Sysser 01 (k0 = 6.9 per metre) means panel centroids at least about 7 mm
-    below the waterline.  That is a constraint on the discretisation, recorded here so it
-    cannot be forgotten when the mesh is built.
+    Section 9 measured g_w and set the mesh constraint from it.  The influence matrix uses
+    the *gradient*, whose integrand carries an extra sec^2(theta), and at
+    (X, Y, |Z|) = (2, 0.8, 0.02) the production grid returned g_w to 1.7e-3 and its
+    gradient 185 per cent wrong.  Both are now checked, and the gradient is checked first.
     """
-    X, Y = -5.9, -2.6
-    for absZ, tol in ((2.0, 1e-13), (0.5, 1e-11), (0.2, 1e-8), (0.1, 1e-6)):
-        ref = wave_part(np.array([X]), np.array([Y]), np.array([-absZ]), refine=6.0)[0]
-        got = wave_part(np.array([X]), np.array([Y]), np.array([-absZ]))[0]
-        assert abs(got - ref) <= tol * max(abs(ref), 1e-3), f"|Z| = {absZ}"
+    for X, Y, absZ in ((2.0, 0.8, 0.02), (0.5, 2.0, 0.01), (0.5, 6.0, 0.02),
+                       (0.2, 6.0, 0.02), (3.5, 3.5, 0.012), (2.0, 2.0, 0.02)):
+        ref = wave_part_gradient(X, Y, -absZ, refine=30.0)
+        got = wave_part_gradient(X, Y, -absZ)
+        err = np.abs(got - ref).max() / np.abs(ref).max()
+        assert err < 3e-3, f"gradient at ({X}, {Y}, {-absZ}) off by {err:.2e}"
+        rv = wave_part(X, Y, -absZ, refine=30.0)
+        gv = wave_part(X, Y, -absZ)
+        assert abs(gv - rv) < 1e-4 * max(abs(rv), 1e-12)
+
+
+def test_the_gradient_is_exact_along_the_centreplane_offset():
+    """Y = 0 puts the integrand's peak at theta = +/- pi/2, outside the range.
+
+    This is the asymmetry that identified the peak as the mechanism: before the local
+    refinement the grid was exact to machine precision along Y = 0 at every |Z| and
+    grossly wrong off it.  Kept as a test because it isolates the peak from everything
+    else in the quadrature.
+    """
+    for absZ in (0.2, 0.05, 0.01, 0.002):
+        ref = wave_part_gradient(2.0, 0.0, -absZ, refine=30.0)
+        got = wave_part_gradient(2.0, 0.0, -absZ)
+        assert np.abs(got - ref).max() < 1e-9 * np.abs(ref).max()
+        # g_w is even in Y, so d/dY vanishes on Y = 0 and only round-off survives.
+        assert abs(got[1]) < 1e-10 * np.abs(got).max()
+
+
+def test_peak_partition_tiles_the_panel_it_replaces():
+    """The correction subtracts a coarse panel and adds a refined one, so the two rules
+    must cover exactly the same interval or the difference is a bias, not a refinement."""
+    _, _, edges = _normalised_grid(120, 12, 16, 300.0, 8.0)
+    xi_star = np.array([-0.0559, 0.0, 0.4, 1.3, -1.9])
+    _, coarse_w, _, fine_w = _peak_refined(edges, xi_star, 16)
+    assert coarse_w.sum(axis=0) == pytest.approx(fine_w.sum(axis=0), rel=1e-14)
+
+
+def test_phase_edges_carry_equal_phase():
+    """Equation (15.1): every panel must carry the same number of cycles."""
+    for cq, cl in ((300.0, 8.0), (0.0, 12.0), (1900.0, 3.6), (5.0, 0.0)):
+        xi = _phase_edges(40, cq, cl)
+        assert xi[0] == 0.0 and xi[-1] == pytest.approx(1.0)
+        assert np.all(np.diff(xi) > 0.0)
+        phase = cq * xi ** 2 + cl * xi
+        per_panel = np.diff(phase)
+        assert per_panel.max() == pytest.approx(per_panel.min(), rel=1e-10)
+
+
+def test_peak_position_lands_on_the_vanishing_imaginary_part():
+    """xi* must be where Im c = 0, i.e. tan(theta) = -X/Y, in normalised coordinates."""
+    X, Y, Z = 2.0, 0.8, -0.02
+    t_max = np.array([np.sqrt(_DAMPING_REACH / abs(Z) - 1.0)])
+    xi_star = _peak_position(np.array([X]), np.array([Y]), t_max)
+    theta, _ = _theta_of_xi_2d(xi_star[None, :], t_max)
+    sec2 = 1.0 / np.cos(theta) ** 2
+    imag_c = -sec2 * (X * np.cos(theta) + Y * np.sin(theta))
+    assert np.abs(imag_c).max() < 1e-12
+    # And that angle is where |c| is least over the range, which is what makes it a peak.
+    grid, _, _ = _normalised_grid(200, 12, 16, 300.0, 8.0)
+    th, _ = _theta_of_xi_2d(grid[:, None], t_max)
+    s2 = 1.0 / np.cos(th) ** 2
+    mag = np.abs(s2 * (abs(Z) - 1j * (X * np.cos(th) + Y * np.sin(th))))
+    at_star = np.abs(sec2 * (abs(Z) - 1j * (X * np.cos(theta) + Y * np.sin(theta)))).max()
+    assert at_star <= mag.min() * 1.001
+
+
+def test_envelope_flags_the_pairs_the_quadrature_cannot_serve():
+    """Outside the envelope the grid hits its panel cap and coarsens without saying so, so
+    the count is exposed and callers check it."""
+    assert oscillation_count(0.0, 0.0, -1.0) < oscillation_count(0.0, 3.0, -0.01)
+    assert envelope_ok(11.1, 3.5, -0.0139)          # a Sysser mesh at Fn = 0.30
+    assert not envelope_ok(8.0, 6.0, -1e-5)         # both points on the free surface
+    # Sysser 01 at Fn = 0.30 with its topmost centroid 1 mm below the surface, at the
+    # production damping reach of 25.  Well inside the 24 000 cap; the section-9 constraint
+    # this replaced would have demanded a 7 mm top row instead.
+    assert oscillation_count(11.1, 3.5, -0.0139) == pytest.approx(1077.0, rel=0.02)
+    assert oscillation_count(11.1, 3.5, -0.0139) < MAX_CYCLES

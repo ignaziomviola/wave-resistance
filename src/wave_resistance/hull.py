@@ -138,6 +138,22 @@ class TriMesh:
     def flipped(self) -> "TriMesh":
         return TriMesh(self.vertices, self.faces[:, ::-1])
 
+    def without_panels_in_plane(self, axis: int = 1, level: float = 0.0,
+                                tol: float = 1e-12) -> "TriMesh":
+        """Drop panels lying entirely in a plane, before mirroring across that plane.
+
+        Such a panel has zero enclosed thickness, and mirroring turns it into two
+        geometrically coincident panels with opposite normals.  Their rows in a
+        source-influence matrix are then identical up to sign, so the matrix is exactly
+        singular -- and a linear solver will return an answer for it without complaint.
+        One such pair, at the stern-keel corner of a Wigley hull where the pointed end and
+        the keel line meet, took the condition number from about 2 to 1e16.
+        """
+        scale = float(np.ptp(self.vertices, axis=0).max()) or 1.0
+        coord = self.triangles()[:, :, axis] - level
+        keep = np.abs(coord).max(axis=1) > tol * scale
+        return TriMesh(self.vertices, self.faces[keep]).compacted()
+
     def compacted(self) -> "TriMesh":
         """Drop vertices no face references, so vertex extents describe the real surface."""
         if self.faces.size == 0:
@@ -410,11 +426,105 @@ class Hull:
         for extra in parts[1:]:
             mesh = mesh.joined(extra)
         if self.mirrored:
+            mesh = mesh.without_panels_in_plane(axis=1, level=0.0)
             mesh = mesh.joined(mesh.mirrored_y())
         if self._datum_shift:
             mesh = TriMesh(mesh.vertices - np.array([0.0, 0.0, self._datum_shift]), mesh.faces)
         if attitude is not None:
             mesh = mesh.transformed(*attitude.matrix())
+        return self._orient(mesh)
+
+    def waterline_fitted_mesh(self, n_girth: int, n_long: int,
+                              attitude: Attitude | None = None,
+                              first_depth: float = 0.0) -> TriMesh:
+        """Body-fitted mesh running from the waterline down to the keel, no clipping.
+
+        Clipping a parametric mesh at z = 0 is exact but produces slivers along the
+        waterline whose centroids sit arbitrarily close to z = 0.  Here the girth direction
+        is parameterised from the waterline instead, so the depth of the first row is
+        controlled rather than inherited from the parameterisation.
+
+        ``first_depth`` is that control, **in metres**, and it is the lower edge of the
+        topmost row.  Zero means uniform girth spacing, which is not the same as no
+        control: it is the reference against which a nonzero value is judged.  A station
+        whose own immersed depth is less than ``first_depth`` -- there is always a
+        neighbourhood of the bow and stern where that holds -- gets a single row spanning
+        all of it, so the guarantee is on the row's lower edge and not on the depth of
+        every centroid.  Callers that need the latter must measure it, and
+        ``docs/formulation.md`` section 15 does.
+
+        Why this parameter exists at all: the Kelvin Green function diverges
+        logarithmically as k0|z + zeta| tends to zero, and the oscillation count of a panel
+        pair grows as |y_i - y_j| / |z_i + z_j|, so a mesh reaching the waterline is the
+        expensive and delicate corner for the wave kernel.  Exposing the depth as a
+        parameter is what makes the dependence measurable instead of accidental, and
+        ``docs/formulation.md`` section 15 reports it.
+
+        A caution on reading that dependence.  The first time it was measured the
+        resistance varied by a factor of 2.5 across this parameter and it looked like the
+        known waterline difficulty of the Neumann-Kelvin problem; it was a quadrature error
+        in the Green function's gradient, and section 15 records it.  A strong dependence
+        here is a reason to check the kernel before it is a reason to believe the physics.
+
+        Only the wetted patches take part.  Requires the free surface at z = 0, so apply
+        the reference datum shift first.
+        """
+        if n_girth < 1 or n_long < 1:
+            raise ValueError("n_girth and n_long must be at least 1")
+        if first_depth < 0.0:
+            raise ValueError("first_depth must not be negative")
+        rot, trans = attitude.matrix() if attitude is not None else (np.eye(3), np.zeros(3))
+        shift = np.array([0.0, 0.0, self._datum_shift])
+
+        def place(u, v, patch):
+            pt = nurbs.evaluate(patch, u, v) - shift
+            return pt @ rot.T + trans
+
+        parts: list[TriMesh] = []
+        for index in self.wetted_patch_indices:
+            patch = self.patches[index]
+            u0, u1 = patch.u_range
+            v0, v1 = patch.v_range
+            uniform = np.arange(n_girth + 1) / n_girth
+            rows = []
+            v_kept = []
+            for v in np.linspace(v0, v1, n_long + 1):
+                if place(u0, v, patch)[2] <= 0.0:
+                    continue                     # station wholly submerged: no waterline
+                if place(u1, v, patch)[2] > 0.0:
+                    continue                     # station wholly dry
+                u_wl = self._bisect_depth(place, patch, v, u0, u1, 0.0)
+                if first_depth <= 0.0 or n_girth < 2:
+                    rows.append(u_wl + (u1 - u_wl) * uniform)
+                    v_kept.append(v)
+                    continue
+                keel_depth = -place(u1, v, patch)[2]
+                if keel_depth <= first_depth:
+                    # Station shallower than the requested first row: one row takes it all.
+                    rows.append(u_wl + (u1 - u_wl) * uniform)
+                    v_kept.append(v)
+                    continue
+                u_first = self._bisect_depth(place, patch, v, u_wl, u1, -first_depth)
+                below = (u1 - u_first) * np.arange(1, n_girth) / (n_girth - 1)
+                rows.append(np.concatenate([[u_wl, u_first], u_first + below]))
+                v_kept.append(v)
+            if len(rows) < 2:
+                raise ValueError("fewer than two stations intersect the free surface")
+            u_grid = np.array(rows)                              # (n_v, n_girth+1)
+            v_grid = np.array(v_kept)[:, None] * np.ones((1, u_grid.shape[1]))
+            pts = place(u_grid.ravel(), v_grid.ravel(), patch).reshape(-1, 3)
+            nv, ng = u_grid.shape
+            idx = np.arange(nv * ng).reshape(nv, ng)
+            a = idx[:-1, :-1].ravel(); b = idx[1:, :-1].ravel()
+            c = idx[1:, 1:].ravel(); d = idx[:-1, 1:].ravel()
+            faces = np.vstack([np.column_stack([a, b, c]), np.column_stack([a, c, d])])
+            parts.append(TriMesh(pts, faces).dropped_degenerate())
+        mesh = parts[0]
+        for extra in parts[1:]:
+            mesh = mesh.joined(extra)
+        if self.mirrored:
+            mesh = mesh.without_panels_in_plane(axis=1, level=0.0)
+            mesh = mesh.joined(mesh.mirrored_y())
         return self._orient(mesh)
 
     def other_patch_mesh(self, n_u: int, n_v: int, attitude: Attitude | None = None) -> TriMesh | None:
@@ -427,12 +537,28 @@ class Hull:
         for extra in parts[1:]:
             mesh = mesh.joined(extra)
         if self.mirrored:
+            mesh = mesh.without_panels_in_plane(axis=1, level=0.0)
             mesh = mesh.joined(mesh.mirrored_y())
         if self._datum_shift:
             mesh = TriMesh(mesh.vertices - np.array([0.0, 0.0, self._datum_shift]), mesh.faces)
         if attitude is not None:
             mesh = mesh.transformed(*attitude.matrix())
         return mesh
+
+    @staticmethod
+    def _bisect_depth(place, patch, v: float, lo: float, hi: float, level: float,
+                      iterations: int = 60) -> float:
+        """Parameter u in [lo, hi] at which the station crosses z = ``level``.
+
+        Assumes z decreases with u over the bracket, which the caller has checked.
+        """
+        for _ in range(iterations):
+            mid = 0.5 * (lo + hi)
+            if place(mid, v, patch)[2] > level:
+                lo = mid
+            else:
+                hi = mid
+        return 0.5 * (lo + hi)
 
     @staticmethod
     def _orient(mesh: TriMesh) -> TriMesh:

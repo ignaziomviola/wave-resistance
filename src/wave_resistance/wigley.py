@@ -87,6 +87,10 @@ def wigley_mesh(length: float = 1.0, beam: float | None = None, draught: float |
     c, d = idx[1:, 1:].ravel(), idx[:-1, 1:].ravel()
     faces = np.vstack([np.column_stack([a, b, c]), np.column_stack([a, c, d])])
     star = TriMesh(pts, faces).dropped_degenerate()
+    # Panels lying wholly in y = 0 would be duplicated by the mirror, giving coincident
+    # panels with opposite normals and an exactly singular influence matrix.  At the
+    # stern-keel corner the grid produces exactly one such triangle.
+    star = star.without_panels_in_plane(axis=1, level=0.0)
     # Orient the starboard sheet outward (+y), then mirror.
     if float(np.einsum("ij,ij->", star.centroids(), star.area_normals())) < 0.0:
         star = star.flipped()
