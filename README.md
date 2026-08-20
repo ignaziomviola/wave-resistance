@@ -21,11 +21,28 @@ symmetry.
 
 ## Status
 
-Milestone M0, the geometry and hydrostatics layer, is complete and verified. The
-Neumann–Kelvin solver is not yet implemented: the integral equation, its jump term, the
-waterline term and the far-field amplitudes are derived and verified in M1 before any
-solver code is written, because writing those constants from memory is how they come out
-quietly wrong. Milestones are listed in `docs/`.
+Milestones M0, the geometry and hydrostatics layer, and M1, the formulation and the Kelvin
+Green function, are complete and verified. The panel solver itself is not yet written.
+
+Two results from M1 are worth stating here. First, a waterline line integral is **not**
+part of this formulation: the Green function already satisfies the free-surface condition
+at every point of z = 0, so a source-only representation never forms the integral that
+produces one. The waterline term of the Neumann–Kelvin literature belongs to the
+Green's-identity formulation. The project plan asserted otherwise, and that assertion is
+withdrawn in `docs/formulation.md`.
+
+Second, the Green function is evaluable only so close to the free surface. Relative error
+against a refined evaluation is 3e-13 at k0|z_i + z_j| = 0.5 but 2e-4 at 0.05, so the panel
+mesh must keep k0|z_i + z_j| above roughly 0.1 — at Fn = 0.3 on Sysser 01, panel centroids
+at least about 7 mm below the waterline. Nothing is missing from the formulation; the
+discretisation has to respect where the kernel can be evaluated.
+
+Throughput, measured on a real Sysser 01 pair distribution, is 928 microseconds per panel
+pair, which is 594 s of assembly for 800 panels and 2090 s for 1500. Against the 10-minute
+budget, 800 panels fits and 1500 does not.
+
+The derivation, every verification and the five silent errors found along the way are in
+`docs/formulation.md`; milestones are in `docs/plan.md`.
 
 ## Installation
 
