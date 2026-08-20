@@ -852,3 +852,12 @@ at the measured attitude, which is what `measurements.sysser01_runs` supplies, i
 `Attitude` takes — metres positive downward and **degrees** bow-down positive. Storing the
 trim in radians and letting the caller convert produced a 57-fold error in the first version
 of this comparison, so the units are now asserted by a test.
+
+The sign of the trim is corroborated rather than assumed: the workbook's $\theta$ reaches
+$-5.27°$ at $Fn = 0.60$ with the model sunk 21 mm, and a yacht at that speed squats at the
+stern and lifts the bow, so a negative $\theta$ must mean bow-up — which is what bow-down
+positive gives. What remains genuinely unconfirmed is the reference point for $z$: the
+workbook places the towing point 255 mm above the waterline and the transducers 0.53664 m
+forward and 0.46336 m aft of the centre of gravity, but does not say where the sinkage was
+measured. Below $Fn = 0.35$ the trim is under 0.11° so the choice hardly matters; by
+$Fn = 0.50$ it is 3.2° and it matters a great deal.

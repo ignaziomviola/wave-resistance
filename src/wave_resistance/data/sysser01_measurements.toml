@@ -22,9 +22,12 @@
 # displacement weight, so it magnifies every error in the prediction.  By Fn = 0.45 it is
 # 15.5 N and 4.2 per cent.  Comparisons should be read across the range, not at one speed.
 #
-# ATTITUDE CONVENTIONS, assumed and not yet confirmed against the release: `sinkage_mm` is
-# the workbook's z, negative meaning the model sank, and `trim_deg` is its theta, taken as
-# bow-down positive to match Attitude, which also takes degrees rather than radians.  The reference point for z is not stated in the
+# ATTITUDE CONVENTIONS.  `sinkage_mm` is the workbook's z, negative meaning the model sank,
+# and `trim_deg` is its theta, taken as bow-down positive to match Attitude, which also
+# takes degrees rather than radians.  The sign is not merely assumed: the workbook's theta
+# reaches -5.27 degrees at Fn = 0.60 with the model sunk 21 mm, and a yacht at that speed
+# squats at the stern and lifts the bow, so a negative theta has to mean bow-up, which is
+# what bow-down-positive gives.  What is genuinely unconfirmed is the reference point for z.  The reference point for z is not stated in the
 # workbook; the towing point is 255 mm above the waterline and the transducers sit 0.53664 m
 # forward and 0.46336 m aft of the centre of gravity.  Below Fn = 0.35 the trim is under 0.11
 # degrees and the convention hardly matters; by Fn = 0.50 it is 3.2 degrees and matters a

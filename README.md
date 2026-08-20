@@ -95,11 +95,20 @@ Requirements are Python 3.10 or later, NumPy and SciPy.
 wave-resistance info data/SYSSER01_surface.igs
 wave-resistance hydrostatics data/SYSSER01_surface.igs --displacement 0.0376136 --compare
 wave-resistance hydrostatics data/SYSSER01_surface.igs --draught 0.127 --heel 20 --trim 0.5
+wave-resistance nk data/SYSSER01_surface.igs --displacement 0.0376136 \
+      --fn 0.30,0.40,0.45 --length 1.6 --girth 6 --stations 28
 ```
 
 The reference condition is set either by a target displaced volume, for which the code
 solves the flotation datum, or by an explicit draught. Prescribed sinkage, trim and heel
-are offsets from that reference condition; they are not solved for.
+are offsets from that reference condition; they are not solved for. Trim and heel are in
+degrees.
+
+`nk` reports both routes to the resistance, the wave-kernel validity envelope, the largest
+wavelength the mesh can carry, the net source flux and the body-condition residual at
+points that are not collocation points. Read the diagnostics: on a hull as beamy as
+Sysser 01 they are what tells you the far-field number is not yet converged. See
+**Status** above and `docs/formulation.md` sections 16 to 20.
 
 ## What has been verified
 
@@ -135,25 +144,54 @@ displaced off the vertices. Waterplanes and station cuts land on mesh vertices r
 
 ## The Sysser 01 reference condition
 
-Matching the published displaced volume of 0.0376136 m^3 at zero trim recovers the
-published canoe-body draught of 0.127040 m to within 0.058 %, and the published
-waterplane area to within 0.053 %, although neither was a target of the solve.
+The primary hydrostatics release, 4TU.ResearchData
+[10.4121/21501375](https://doi.org/10.4121/21501375), has been downloaded and verified
+against its published MD5, and every published value used here is transcribed from it with
+provenance. Two conventions it settles: LCB and LCF are measured from the midpoint of the
+**upright** waterline, and the heeled columns hold displacement constant, so heel requires
+solving sinkage and trim rather than rotating at fixed sinkage.
 
-Three quantities do not reconcile: waterline length is 0.51 % high, waterline beam 1.11 %
-high and wetted area 2.10 % high. Attitude does not account for this. Solving heave and
-trim together to match the published volume and longitudinal centre of buoyancy converges
-to a bow-up trim of 0.5704°, and matches both targets, but increases every one of those
-three discrepancies.
+Matching the published displaced volume of 0.0376136 m³ at zero trim recovers the published
+waterplane area to 0.060 % and the published canoe-body draught to 0.081 %, neither of which
+was a target of the solve.
 
-The published table is internally consistent on its own numbers, so it describes a real
-hull. The most likely explanation lies in the provenance of the supplied file, whose
-header path reads "Rhino modellen na inmeten 2012", i.e. Rhino models after measuring,
-2012, and whose surface is named "Gerebuild oppervlak", i.e. reconstructed surface. The
-file is a re-measurement of the physical model made in 2012, whereas the published
-hydrostatics may derive from the original 1981 lines. Wetted area is the quantity most
-sensitive to local surface fairness, and it shows the largest discrepancy. Milestone M4
-resolves this against the primary release; until then the discrepancy is carried as a
-stated bias, not assumed away.
+Three quantities do not reconcile: waterline length is 0.52 % high, waterline beam 1.15 %
+high and wetted area 2.10 % high. Attitude does not account for it — solving heave and trim
+together to match the published volume and LCB converges to 0.5704° bow-up, matches both
+targets, and increases all three discrepancies.
+
+Reading the primary release removes the remaining innocent explanation: the published table
+is not a transcription error, and it is internally consistent on its own numbers. What is
+left is the supplied file's provenance. Its header path reads "Rhino modellen na inmeten
+2012" — Rhino models after measuring, 2012 — and its surface is named "Gerebuild oppervlak",
+reconstructed surface. The file is a 2012 re-measurement of the physical model; the table
+describes the hull as the series was built and towed. Wetted area is the quantity most
+sensitive to local surface fairness and shows the largest gap. This is carried as a stated
+geometry-provenance bias in every comparison, not assumed away.
+
+## The Sysser 01 measurements
+
+The measurement release, 4TU.ResearchData
+[10.4121/21501402](https://doi.org/10.4121/21501402), gives total resistance and the
+dynamic sinkage and trim per speed. It does not give residuary resistance: that follows from
+an ITTC-57 friction line at form factor zero, so **residuary resistance is a proxy for wave
+resistance, not a measurement of it** — it also contains nonlinear and viscous-form
+contributions.
+
+Two features of the reduced data govern how any comparison must be read.
+
+At Fn = 0.30 the measured residuary resistance is 1.13 N, **0.31 % of displacement weight**,
+so that speed magnifies every error in a prediction. At Fn = 0.45 it is 15.5 N and 4.2 %.
+Comparisons belong across the range, and Fn = 0.30 is the least informative point in it.
+
+At Fn = 0.10 the subtraction gives −0.008 N. That negative value is kept as it comes out: it
+says the ITTC-57 line slightly over-predicts this model's friction at Re = 5.9 × 10⁵, which
+is information about the reduction, and clamping it would hide the one speed at which the
+reduction visibly fails.
+
+The model sinks 25 mm and trims 1.6° bow-up by Fn = 0.45, against a canoe-body draught of
+127 mm, so comparisons above Fn = 0.35 must run at the measured attitude.
+`measurements.sysser01_runs()` supplies it in the units `Attitude` takes.
 
 ## Data
 
