@@ -77,3 +77,44 @@ def uv_sphere(radius: float = 1.0, centre=(0.0, 0.0, 0.0), n_theta: int = 64,
         faces.append(np.column_stack([a, b2, a2]))
     mesh = TriMesh(pts.reshape(-1, 3), np.vstack(faces)).dropped_degenerate()
     return mesh if mesh.signed_volume() > 0 else mesh.flipped()
+
+
+def icosphere(radius: float = 1.0, subdivisions: int = 3) -> TriMesh:
+    """Closed sphere from a subdivided icosahedron: near-uniform, no polar slivers.
+
+    A UV sphere is a poor panel-method test body because its polar triangles are slivers,
+    which spoils the convergence rate for reasons that have nothing to do with the method
+    being tested.
+    """
+    t = (1.0 + 5.0 ** 0.5) / 2.0
+    verts = np.array([
+        [-1, t, 0], [1, t, 0], [-1, -t, 0], [1, -t, 0],
+        [0, -1, t], [0, 1, t], [0, -1, -t], [0, 1, -t],
+        [t, 0, -1], [t, 0, 1], [-t, 0, -1], [-t, 0, 1],
+    ], dtype=float)
+    faces = np.array([
+        [0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11],
+        [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8],
+        [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9],
+        [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1],
+    ])
+    for _ in range(subdivisions):
+        cache: dict[tuple[int, int], int] = {}
+        vlist = list(verts)
+        new_faces = []
+
+        def midpoint(i: int, j: int) -> int:
+            key = (min(i, j), max(i, j))
+            if key not in cache:
+                cache[key] = len(vlist)
+                vlist.append(0.5 * (vlist[i] + vlist[j]))
+            return cache[key]
+
+        for a, b, c in faces:
+            ab, bc, ca = midpoint(a, b), midpoint(b, c), midpoint(c, a)
+            new_faces += [[a, ab, ca], [b, bc, ab], [c, ca, bc], [ab, bc, ca]]
+        verts = np.array(vlist)
+        faces = np.array(new_faces)
+    verts = radius * verts / np.linalg.norm(verts, axis=1)[:, None]
+    mesh = TriMesh(verts, faces)
+    return mesh if mesh.signed_volume() > 0 else mesh.flipped()

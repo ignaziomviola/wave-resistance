@@ -21,8 +21,10 @@ symmetry.
 
 ## Status
 
-Milestones M0, the geometry and hydrostatics layer, and M1, the formulation and the Kelvin
-Green function, are complete and verified. The panel solver itself is not yet written.
+Milestones M0 (geometry and hydrostatics), M1 (formulation and the Kelvin Green function)
+and M2 (constant-source panels and the Rankine solver) are complete and verified. What
+remains is M3: assembling the wave kernel into the influence matrix, solving, and taking
+the resistance from the far-field amplitude.
 
 Two results from M1 are worth stating here. First, a waterline line integral is **not**
 part of this formulation: the Green function already satisfies the free-surface condition
@@ -41,7 +43,14 @@ Throughput, measured on a real Sysser 01 pair distribution, is 928 microseconds 
 pair, which is 594 s of assembly for 800 panels and 2090 s for 1500. Against the 10-minute
 budget, 800 panels fits and 1500 does not.
 
-The derivation, every verification and the five silent errors found along the way are in
+Panel influences integrate the kernel over the whole panel; centroid value times area is
+used nowhere. The sphere in an unbounded stream recovers the analytically derived density
+1.5 u n_x, at first order in panel size with a Richardson extrapolant of 1.5008. First
+order is the correct expectation for a piecewise-constant density, and the plan's
+second-order criterion for that test was mistaken; imposing the exact density instead shows
+the geometry and potential evaluation are second order, as they should be.
+
+The derivation, every verification and the six silent errors found along the way are in
 `docs/formulation.md`; milestones are in `docs/plan.md`.
 
 ## Installation

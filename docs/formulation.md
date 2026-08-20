@@ -324,3 +324,73 @@ Recorded because each was silent, and each is now covered by a test.
    reach, rather than the count at which its terms stop shrinking. The series is
    asymptotic, not convergent, so running past $n \approx |c|$ diverges: at $|c| = 30$ this
    turned a 1e-12 floor into a 100 per cent error.
+
+---
+
+# M2 results: constant-source panels and the Rankine solver
+
+## 13. Influence coefficients
+
+With the kernel $G = -1/(4\pi r)$ the potential of a panel carrying constant density
+$\sigma$ is $\phi = -(\sigma/4\pi)I_0$, $I_0$ being the integral of $1/r$ over the panel.
+In a frame with the panel in its own plane $\zeta = 0$,
+
+$$\frac{\partial I_0}{\partial\zeta} = -\Omega,\qquad
+\frac{\partial I_0}{\partial\xi} = -\sum_{\text{edges}} \frac{\eta_{i+1}-\eta_i}{d_i} L_i,\qquad
+\frac{\partial I_0}{\partial\eta} = +\sum_{\text{edges}} \frac{\xi_{i+1}-\xi_i}{d_i} L_i, \tag{13.1}$$
+
+with $L_i = \ln\left[(r_i + r_{i+1} + d_i)/(r_i + r_{i+1} - d_i)\right]$ and $\Omega$ the
+signed solid angle. Every influence therefore integrates the kernel over the whole panel;
+centroid value times area appears nowhere.
+
+Two properties of $\Omega$ are worth having. It is computed by Van Oosterom and Strackee's
+formula, which needs no case analysis and is stable for near-degenerate configurations, and
+it gives exactly $4\pi$ at any point enclosed by an outward-oriented closed surface and $0$
+outside — verified to 1e-9 on a subdivided icosahedron. And because the normal velocity of
+a panel is exactly $\sigma\Omega/4\pi$, the jump term of the integral equation is not bolted
+on: a field point in a panel's own plane but outside it gets exactly zero, as symmetry
+demands, and one approaching the panel gets $\sigma/2$.
+
+Signs and the branch of $L_i$ were fixed against direct quadrature over the panel, not
+asserted; analytic and quadrature velocities agree to 1e-9 relative from four panel radii
+down to 0.4.
+
+The diagonal is nevertheless imposed rather than evaluated. At a point in the panel's own
+plane the solid-angle formula has a vanishing numerator, so whether $+2\pi$ or $-2\pi$
+emerges depends on the sign of a floating-point zero. The field point approaches from the
+fluid side, so the required limit is $+1/2$.
+
+## 14. The sphere, and a correction to the plan's acceptance criterion
+
+The exact density is derived, not recalled. A surface density $\sigma_1\cos\theta$ on
+$r = a$ produces the exterior potential $-\sigma_1 a^3\cos\theta/(3r^2)$; matching the
+sphere-in-a-stream dipole $-u a^3\cos\theta/(2r^2)$ requires $\sigma_1 = 3u/2$, and
+$n_x = \cos\theta$, so $\sigma = \tfrac{3}{2}u\,n_x$.
+
+Measured on a subdivided icosahedron, chosen because a UV sphere's polar slivers spoil the
+convergence rate for reasons unrelated to the method (its density scatter is more than
+three times worse at comparable panel count):
+
+| panels | 80 | 320 | 1280 | 5120 |
+|---|---|---|---|---|
+| mean $\sigma/(u n_x)$ | 1.6969 | 1.6003 | 1.5504 | 1.5256 |
+| error against 3/2 | 0.197 | 0.100 | 0.0504 | 0.0256 |
+
+The error halves with each halving of panel size: **first order**, and Richardson
+extrapolation of the last two levels gives 1.5008, i.e. 3/2 to 0.05 per cent. The
+condition number of the influence matrix is below 2 at every level, so nothing here is a
+conditioning artefact.
+
+**The plan's V3 criterion — 0.5 per cent at 1200 panels with second-order convergence —
+was wrong, and is corrected here.** Piecewise-constant collocation on a curved body is
+first order in the density, because the best piecewise-constant approximation to a smooth
+density is itself only $O(h)$. Second order would need a linear density representation.
+The achieved 5 per cent at 1280 panels with a first-order rate and an extrapolant good to
+0.05 per cent is the correct expectation, and it confirms the jump term and the panel
+integration, which is what V3 exists to do.
+
+Separating the solve from the geometry confirms this reading. Imposing the exact density
+$\tfrac{3}{2}u\,n_x$ on the faceted sphere and evaluating the exterior potential gives
+errors of 1.27e-1, 3.38e-2 and 8.61e-3 against the analytic dipole — clean second order.
+So the geometry and the potential evaluation are second-order accurate, and the first-order
+behaviour belongs to the piecewise-constant density alone.
