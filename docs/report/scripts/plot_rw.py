@@ -39,8 +39,9 @@ ax.plot(fn, far, "k--", lw=0.9, marker="^", ms=3.6, mfc="w",
 ax.plot(fn, pre, "k-.", lw=0.9, marker="v", ms=3.6, mfc="0.6",
         label=r"$R_W$, pressure")
 if me:
-    ax.plot([r["fn"] for r in me], [r["r_press"] for r in me], "k:", lw=1.0,
-            marker="d", ms=3.6, mfc="k", label=r"$R_W$, pressure, measured attitude")
+    ax.plot([r["fn"] for r in me], [r["r_press"] for r in me], linestyle="none",
+            marker="d", ms=3.6, mfc="k", color="k",
+            label=r"$R_W$, pressure, measured attitude")
 ax.axhline(0.0, color="0.6", lw=0.5)
 ax.set_xlabel(r"$\mathit{Fn}$"); ax.set_ylabel(r"$R$ [N]")
 ax.set_xlim(0.0, 0.6); ax.set_ylim(0.0, 60.0)
@@ -49,20 +50,19 @@ ax.legend(frameon=False, fontsize=6.6, loc="upper left", handlelength=2.2)
 ax.set_title("(a)", loc="left")
 
 ax = axes[1]
-m = (fn > 0.12) & (fn < 0.56)
-ax.semilogy(fn[m], rr[m], "k-", lw=1.2, marker="o", ms=3.6, label=r"$R_r$, measured")
-ax.semilogy(fn[m], np.abs(far[m]), "k--", lw=0.9, marker="^", ms=3.6, mfc="w",
-            label=r"$R_W$, far field")
+m = fn > 0.12
+ax.semilogy(fn[m], rr[m], "k-", lw=1.2, marker="o", ms=3.6)
+ax.semilogy(fn[m], np.abs(far[m]), "k--", lw=0.9, marker="^", ms=3.6, mfc="w")
 pp = np.where(pre > 0, pre, np.nan)
-ax.semilogy(fn[m], pp[m], "k-.", lw=0.9, marker="v", ms=3.6, mfc="0.6",
-            label=r"$R_W$, pressure")
+ax.semilogy(fn[m], pp[m], "k-.", lw=0.9, marker="v", ms=3.6, mfc="0.6")
 neg = m & (pre <= 0)
 if neg.any():
     ax.semilogy(fn[neg], np.abs(pre[neg]), linestyle="none", marker="x", ms=4.5,
                 color="k", label=r"$R_W < 0$, pressure")
 if me:
-    ax.semilogy([r["fn"] for r in me], [max(r["r_press"], 1e-3) for r in me], "k:",
-                lw=1.0, marker="d", ms=3.6, mfc="k")
+    mp = [(r["fn"], r["r_press"]) for r in me if r["r_press"] > 0]
+    ax.semilogy([a for a, _ in mp], [b for _, b in mp], linestyle="none", marker="d",
+                ms=3.6, mfc="k", color="k")
 ax.set_xlabel(r"$\mathit{Fn}$"); ax.set_ylabel(r"$R$ [N]")
 ax.set_xlim(0.1, 0.6); ax.set_ylim(0.01, 100.0)
 ax.set_xticks([0.1, 0.2, 0.3, 0.4, 0.5, 0.6])
@@ -83,7 +83,9 @@ ax.plot(fn[good], pre[good] / rr[good], "k-.", lw=0.9, marker="v", ms=3.6, mfc="
         label="pressure")
 ax.axhline(1.0, color="0.4", lw=0.7, ls="-")
 ax.set_xlabel(r"$\mathit{Fn}$"); ax.set_ylabel(r"$R_W/R_r$")
-ax.set_xlim(0.1, 0.6); ax.set_xticks([0.1, 0.2, 0.3, 0.4, 0.5, 0.6])
+ax.set_xlim(0.1, 0.6); ax.set_ylim(-2.0, 10.0)
+ax.set_xticks([0.1, 0.2, 0.3, 0.4, 0.5, 0.6])
+ax.set_yticks([-2, 0, 2, 4, 6, 8, 10])
 ax.legend(frameon=False, fontsize=7, handlelength=2.2)
 ax.set_title("(a)", loc="left")
 

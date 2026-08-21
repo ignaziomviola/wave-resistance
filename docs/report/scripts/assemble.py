@@ -165,10 +165,10 @@ ratios_f = [(r["fn"], r["r_far"] / r["rr_meas"]) for r in usable]
 peak = max(srt, key=lambda r: r["r_press"])
 negs = [r["fn"] for r in srt if r["r_press"] <= 0.0]
 stats = {
- "RATPMIN": f"{min(v for _, v in ratios_p):+.2f}",
- "RATPMAX": f"{max(v for _, v in ratios_p):+.2f}",
- "RATFMIN": f"{min(v for _, v in ratios_f):+.2f}",
- "RATFMAX": f"{max(v for _, v in ratios_f):+.2f}",
+ "RATPMIN": f"\\num{{{min(v for _, v in ratios_p):+.2f}}}",
+ "RATPMAX": f"\\num{{{max(v for _, v in ratios_p):+.2f}}}",
+ "RATFMIN": f"\\num{{{min(v for _, v in ratios_f):+.2f}}}",
+ "RATFMAX": f"\\num{{{max(v for _, v in ratios_f):+.2f}}}",
  "RATSPREAD": f"{max(v for _, v in ratios_p) / min(v for _, v in ratios_p if v > 0):.0f}",
  "PEAKFN": f"{peak['fn']:.2f}",
  "PEAKVAL": f"{peak['r_press']:.2f}",
@@ -178,6 +178,8 @@ stats = {
  "FN30F": f"{by_fn[0.3]['r_far']:.3f}" if 0.3 in by_fn else "n/a",
  "FN30RAT": f"{by_fn[0.3]['r_press'] / by_fn[0.3]['rr_meas']:.2f}" if 0.3 in by_fn else "n/a",
  "NPOINTS": str(len(srt)),
+ "RATP25": f"\\num{{{by_fn[0.25]['r_press'] / by_fn[0.25]['rr_meas']:+.2f}}}" if 0.25 in by_fn else "n/a",
+ "RATP35": f"\\num{{{by_fn[0.35]['r_press'] / by_fn[0.35]['rr_meas']:+.2f}}}" if 0.35 in by_fn else "n/a",
  "FNLO": f"{srt[0]['fn']:.2f}",
  "FNHI": f"{srt[-1]['fn']:.2f}",
 }
@@ -194,8 +196,26 @@ if mrec:
         f"$\\Fn = {r['fn']:.2f}$: \\SI{{{r['r_press']:.3f}}}{{\\newton}} against "
         f"\\SI{{{by_fn[round(r['fn'], 2)]['r_press']:.3f}}}{{\\newton}}"
         for r in ms if round(r["fn"], 2) in by_fn)
+def _michell_data():
+    """Prefer the final JSON; fall back to the blocks the run prints as it goes."""
+    if (B / "michell.json").exists():
+        return json.load(open(B / "michell.json"))
+    text = (B / "lmichell.txt").read_text()
+    out, depth, start = {}, 0, None
+    for i, ch in enumerate(text):
+        if ch == "{":
+            if depth == 0:
+                start = i
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                out.update(json.loads(text[start:i + 1]))
+    return out
+
+
 try:
-    mich = json.load(open(B / "michell.json"))
+    mich = _michell_data()
     parts_m = []
     for fk, row in sorted(mich.items()):
         fn = fk.replace("fn", "")

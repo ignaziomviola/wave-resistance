@@ -34,7 +34,7 @@ by a Neumann--Kelvin Panel Method}
 \small
 \textbf{Verification report on the \texttt{wave-resistance} code.}\\[2mm]
 Repository: \url{https://github.com/ignaziomviola/wave-resistance}\\
-Commit reviewed: \texttt{ebbe169}\\
+Commit reviewed: \texttt{bf52124}\\
 Report compiled: 21 August 2026
 \end{minipage}
 \end{center}
@@ -54,10 +54,10 @@ second order and match the published displaced volume and waterplane area to bet
 condition to \num{3.8e-08}, a property the code never imposes numerically. The wave resistance of
 Sysser 01 is not converged on any mesh the code's throughput of
 \SI{1164}{\micro\second} per panel pair permits. Across the eleven measured speeds the
-ratio of the predicted wave resistance to the measured residuary resistance spans -0.46 to
-+4.41 by the pressure route, and the predicted curve peaks at $\Fn = $~0.40 while the
-measurement rises monotonically, so the agreement to 0.73 at $\Fn = 0.30$ is one point in
-a wide scatter rather than a validation.
+ratio of the predicted wave resistance to the measured residuary resistance spans \num{-0.46} to
+\num{+4.41} by the pressure route, and the predicted curve peaks at $\Fn = $~0.60 while the
+measurement rises monotonically, so the agreement to \num{0.73} at $\Fn = 0.30$ is one point in a
+wide scatter rather than a validation.
 Two obstructions with disjoint speed ranges account for this and together cover the useful
 range: below $\Fn \approx 0.35$ the measured residuary resistance is under
 \SI{0.6}{\percent} of displacement weight, so the discretisation error is comparable to the
@@ -466,8 +466,9 @@ from it. Table~\ref{tab:resistance} gives the same data with the solver's diagno
 \centering
 \includegraphics[width=\textwidth]{../figures/resistance.pdf}
 \caption{Resistance versus $\Fn$ for Sysser 01, on the 280-panel mesh at the static
-attitude, on (a) linear and (b) logarithmic ordinate. Crosses in (b) mark points at which
-the pressure route returns a negative resistance and the magnitude is plotted.}
+attitude, on (a) linear and (b) logarithmic ordinate, the symbols of (b) being those of
+(a). Crosses in (b) mark the two speeds at which the pressure route returns a negative
+resistance, whose magnitude is plotted.}
 \label{fig:resistance}
 \end{figure}
 
@@ -495,6 +496,10 @@ S[table-format=1.3]S[table-format=2.2]@{}}
 0.300 & 1.134 & 0.31 & 2.973 & 0.824 & +2.62 & +0.73 & 0.094 & 3.20 \\
 0.350 & 2.266 & 0.62 & 13.495 & 7.001 & +5.96 & +3.09 & 0.120 & 3.73 \\
 0.400 & 6.632 & 1.80 & 14.653 & 12.361 & +2.21 & +1.86 & 0.130 & 4.26 \\
+0.450 & 15.503 & 4.21 & 10.563 & 6.943 & +0.68 & +0.45 & 0.118 & 4.79 \\
+0.500 & 27.976 & 7.59 & 8.927 & 8.398 & +0.32 & +0.30 & 0.121 & 5.32 \\
+0.550 & 38.943 & 10.57 & 17.524 & 16.795 & +0.45 & +0.43 & 0.125 & 5.86 \\
+0.600 & 44.578 & 12.10 & 31.860 & 28.300 & +0.71 & +0.63 & 0.134 & 6.39 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -504,25 +509,32 @@ single speed.
 
 \textit{The ratio of prediction to measurement is not constant across the range.} Over the
 speeds at which the measured residuary resistance exceeds \SI{0.05}{\newton}, the pressure
-route spans -0.46 to +4.41 of measurement and the far-field route +2.21 to +9.96.
+route spans \num{-0.46} to \num{+4.41} of measurement and the far-field route \num{+0.32} to \num{+9.96}.
 At $\Fn = 0.30$ the pressure route gives \SI{0.824}{\newton} against a measured
 \SI{1.134}{\newton}, a ratio of 0.73, which taken alone would read as a validation. It is
-not one: it is a single point in a scatter of a factor of 6, and the speeds either
-side of it disagree by more than a factor of three.
+not one: it is a single point in a scatter that spans \num{-0.46} to \num{+4.41}, and the speeds
+either side of it disagree with measurement by factors of \num{-0.46} and \num{+3.09}.
 
 \textit{The predicted curve has the wrong shape.} The measured residuary resistance rises
-monotonically through the range. The prediction peaks at $\Fn = $~0.40, at
-\SI{12.36}{\newton}, and falls thereafter, so the disagreement is not a calibration error
-that a constant factor would absorb. Part of the fall is expected and attributable: above
-$\Fn \approx 0.40$ the sweep runs at the static attitude, because the measured attitude
-cannot be applied there, and a hull run too shallow makes less wave. That accounts for the
-sign of the discrepancy at the top of the range but not for its magnitude.
+monotonically through the range. The prediction does not: it reaches a local maximum of
+\SI{28.30}{\newton} at $\Fn = $~0.60, falls to \SI{6.94}{\newton} at $\Fn = 0.45$ and
+\SI{8.40}{\newton} at $\Fn = 0.50$, and rises again to \SI{28.30}{\newton} at
+$\Fn = 0.60$. The disagreement is therefore not a calibration error that a constant factor
+would absorb. Part of the deficit at the top of the range is expected and attributable:
+above $\Fn \approx 0.40$ the sweep runs at the static attitude, because the measured
+attitude cannot be applied there, and a hull run \SI{31}{\milli\metre} too shallow makes
+less wave. That accounts for the sign of the discrepancy above $\Fn = 0.40$ but not for the
+non-monotonicity below it.
 
-\textit{The pressure route returns a negative resistance at 2 speeds}, at
-$\Fn = $~0.10, 0.25. A negative wave resistance is unphysical, and it is reported rather than
-clipped because it states plainly that the discretisation error exceeds the signal at those
-speeds. At $\Fn = 0.25$ the measured target is \SI{0.527}{\newton}, which is
-\SI{0.14}{\percent} of displacement weight.
+\textit{The two routes converge on each other as $\Fn$ rises.} They differ by a factor of
+\num{5.7} at $\Fn = 0.15$, by a factor of \num{3.6} at $\Fn = 0.30$, and by \SI{6}{\percent} at
+$\Fn = 0.50$ and \SI{13}{\percent} at $\Fn = 0.60$. Since the two routes share the source
+density and differ only in how the resistance is extracted from it, their convergence
+measures how well the mesh resolves the wave spectrum, and the largest wave parameter the
+mesh carries rises from \num{1.02} to \num{6.39} across the same range. Agreement between
+the routes is thus a necessary condition that is met at high $\Fn$ and not at low, and it is
+independent of whether either route agrees with the measurement --- at $\Fn = 0.50$ they
+agree with each other to \SI{6}{\percent} and both sit at \num{0.3} of measurement.
 
 \subsection{The peak near \texorpdfstring{$\Fn = 0.35$}{Fn = 0.35} is not an attitude
 artefact}
@@ -568,6 +580,7 @@ S[table-format=1.3]S[table-format=1.3]@{}}
 & {$N=280$} & {$N=480$} \\
 \midrule
 0.30 & 2.973 & 3.049 & +2.6 & 0.824 & 0.831 & +0.9 & 0.094 & 0.041 \\
+0.45 & 10.563 & 11.027 & +4.4 & 6.943 & 7.681 & +10.6 & 0.118 & 0.071 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -580,7 +593,7 @@ integral quoted in its docstring are not asserted, so a fault scaling both route
 would pass it. That is not hypothetical: the documented history of this code includes a
 fourfold error in the constant of \eqref{eq:farfield}, which is exactly such a fault. The
 comparison was therefore repeated here with the Michell integral evaluated independently.
-Both routes, as ratios to the oracle, give PENDING. The constant $\rho g^2/(\uppi u^4)$ is
+Both routes, as ratios to the oracle, give $\Fn = 0.30$ at 278 panels, 0.935 and 0.945; $\Fn = 0.30$ at 558 panels, 0.924 and 0.970. The constant $\rho g^2/(\uppi u^4)$ is
 confirmed end to end, through the influence matrix and the solve, and not merely
 self-consistently.
 
@@ -600,15 +613,24 @@ useful speed range.
 Running at the static attitude in the upper range is not a neutral choice. The model sinks
 \SI{31}{\milli\metre} and trims \ang{3.2} bow-up by $\Fn = 0.50$, against a canoe-body
 draught of \SI{127}{\milli\metre}, and a hull run that much too shallow makes less wave, so
-the prediction must undershoot there. It does, and monotonically.
+the prediction must undershoot there. It does, by the pressure route reaching
+\num{0.45} of measurement at $\Fn = 0.45$ and \num{0.30} at $\Fn = 0.50$, though not
+monotonically: the ratio recovers to \num{0.43} and \num{0.63} at $\Fn = 0.55$ and
+\num{0.60}, where the attitude error is larger still. The undershoot is therefore
+consistent with the attitude in sign but is not explained by it alone.
 
 \subsection{Diagnostics}
 
 Figure~\ref{fig:diagnostics} plots the ratio of prediction to measurement and two of the
 solver's diagnostics against $\Fn$. The body-condition residual measured at points the
-solve never sees is the one to read, and it behaves: it is largest at the lowest speeds,
-where the wavelength is short compared with a panel. The largest wave parameter the mesh
-resolves rises with $\Fn$, so the low-speed end of the range is doubly penalised --- the
+solve never sees is the one to read, and it is flat: it lies between \num{0.066} and
+\num{0.147} of $u$ at every speed, and its largest value is at $\Fn = 0.10$, where the
+wavelength is short compared with a panel. It does not track the ratio in
+figure~\ref{fig:diagnostics}a at all, which is the useful negative result here: a residual
+of \num{0.12} accompanies a ratio of \num{3.09} at $\Fn = 0.35$ and \num{0.30} at
+$\Fn = 0.50$, so the residual is necessary but nowhere near sufficient as an accuracy
+indicator. The largest wave parameter the mesh resolves does rise with $\Fn$, from
+\num{1.02} to \num{6.39}, so the low-speed end of the range is doubly penalised --- the
 signal is smallest there and the spectrum the mesh can carry is narrowest.
 
 \begin{figure}[htbp]
@@ -655,8 +677,9 @@ gradient over the panel pairs a Sysser 01 mesh forms at $\Fn = 0.30$. The radiat
 condition's branch is settled by measurement rather than asserted.
 
 \textit{The solve.} The influence matrix, the constrained solve and both resistance routes
-reproduce the Michell oracle on a thin Wigley hull to within 6 per cent at 278 panels, and
-agree with each other to \SI{0.4}{\percent} there. The sphere in an unbounded stream
+reproduce the Michell oracle on a thin Wigley hull to \num{0.935} and \num{0.945} of it at
+278 panels, agreeing with each other to \SI{1.1}{\percent}, as measured here against an
+independently evaluated oracle. The sphere in an unbounded stream
 recovers the analytically derived density $\tfrac{3}{2}u\,n_x$ at first order with a
 Richardson extrapolant of \num{1.5008}.
 
@@ -727,8 +750,8 @@ $\Fn = 0.30$.
 
 The wave resistance of Sysser 01 is not converged on any mesh the code's throughput permits.
 Across the eleven measured speeds the ratio of
-prediction to measurement spans -0.46 to +4.41 by the pressure route, and the predicted
-curve peaks at $\Fn = $~0.40 while the measurement rises monotonically. Refining from 280
+prediction to measurement spans \num{-0.46} to \num{+4.41} by the pressure route, and the predicted
+curve peaks at $\Fn = $~0.60 while the measurement rises monotonically. Refining from 280
 to 480 panels at $\Fn = 0.30$ moves the pressure value by only +0.9~\si{\percent} and
 halves the body-condition residual, so the solve is converging even where the resistance is
 not, and the resistance constant $\rho g^2/(\uppi u^4)$ is confirmed end to end against an
