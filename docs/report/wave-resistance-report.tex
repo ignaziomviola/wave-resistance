@@ -34,7 +34,7 @@ by a Neumann--Kelvin Panel Method}
 \small
 \textbf{Verification report on the \texttt{wave-resistance} code.}\\[2mm]
 Repository: \url{https://github.com/ignaziomviola/wave-resistance}\\
-Commit reviewed: \texttt{19aa675}\\
+Commit reviewed: \texttt{b33ec3b}\\
 Report compiled: 21 August 2026
 \end{minipage}
 \end{center}
@@ -803,6 +803,21 @@ S[table-format=1.3]S[table-format=2.2]@{}}
 \bottomrule
 \end{tabular}
 \end{table}
+
+Figure~\ref{fig:byhull} puts the computed and measured curves side by side, one panel per
+hull and on common axes, which is the most direct form of the comparison.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{../figures/resistance_by_hull.pdf}
+\caption{Computed wave resistance and measured residuary resistance versus $\Fn$ for
+(a) Sysser 01 on a 280-panel mesh and (b) Sysser 50 on a 320-panel mesh, both at the static
+attitude and both by the pressure route. Residuary resistance is a proxy for wave resistance
+rather than a measurement of it: it follows from the measured total resistance by subtracting
+an ITTC-57 friction line at form factor zero, so it also contains nonlinear and viscous-form
+contributions.}
+\label{fig:byhull}
+\end{figure}
 
 Three features distinguish Sysser 50's comparison from Sysser 01's. The ratio of prediction
 to measurement spans \numrange{0.44}{2.13} by the pressure route, against \numrange{-0.46}{4.41} for Sysser 01, and the
