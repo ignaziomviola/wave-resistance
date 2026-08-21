@@ -107,17 +107,28 @@ def test_the_trim_pivot_is_the_published_lcb():
         assert trim_pivot_x(sysser, 1.25) == pytest.approx(1.25 + hull_reference(sysser)["lcb"])
 
 
-def test_the_pivot_vertical_position_does_not_matter():
-    """Only the pivot's x matters: a vertical offset is a surge plus a second-order heave."""
+def test_only_the_pivots_longitudinal_position_matters():
+    """Displacing the pivot vertically is a surge plus a second-order heave.
+
+    The surge is dz sin(trim) and no wave resistance depends on it; the heave is
+    dz (1 - cos(trim)), which is 0.18 mm for dz = 0.1 m at the largest trim Sysser 50 was
+    towed at.  That is not nothing -- this hull gains 1.8 per cent of displaced volume per
+    millimetre of immersion -- so the claim is that the effect is second order and small,
+    not that it vanishes.  Asserted at the size it actually has, since a tolerance chosen
+    for the conclusion one wants is not a test.
+    """
     ref = hull_reference(50)
     hull = Hull.from_iges("data/SYSSER50_surface.igs")
     hull = hull.with_datum_shift(solve_reference_heave(hull, ref["volume"]))
     run = max(hull_runs(50), key=lambda r: abs(r.trim))
-    volumes = []
-    for z in (0.0, -0.1):
-        att = Attitude(sinkage=run.sinkage, trim=run.trim, pivot=(0.83, 0.0, z))
-        volumes.append(hydrostatics(hull.mesh(32, 160, att)).volume)
-    assert volumes[0] == pytest.approx(volumes[1], rel=2e-3)
+    dz = 0.1
+    volumes = [hydrostatics(hull.mesh(32, 160,
+                                      Attitude(sinkage=run.sinkage, trim=run.trim,
+                                               pivot=(0.83, 0.0, z)))).volume
+               for z in (0.0, -dz)]
+    equivalent_heave = dz * (1.0 - np.cos(np.radians(run.trim)))
+    assert equivalent_heave < 2.0e-4
+    assert abs(volumes[1] / volumes[0] - 1.0) < 5.0e-3
 
 
 def test_sysser50_runs_are_read_and_reduced():
