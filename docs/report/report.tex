@@ -1,0 +1,147 @@
+% Verification report for the wave-resistance solver.
+% Prepared in the VOILAb paper-template style (Viola, VOILAb Paper-Writing Guide, 2025).
+\documentclass[11pt]{article}
+
+\usepackage[a4paper,margin=25mm]{geometry}
+\usepackage{amsmath,amssymb,bm}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{siunitx}
+\usepackage{caption}
+\usepackage[british]{babel}
+\usepackage[hidelinks]{hyperref}
+\usepackage{upgreek}
+\usepackage{natbib}
+\bibliographystyle{plainnat}
+
+\sisetup{detect-all, per-mode=symbol, range-phrase={ to }, range-units=single}
+\captionsetup{font=small, labelfont=bf}
+\setlength{\parskip}{0pt}
+\renewcommand{\arraystretch}{1.12}
+\newcommand{\Fn}{\mathit{Fn}}
+
+\title{\vspace{-12mm}\bfseries Wave Resistance of a Systematic Yacht Hull\\
+by a Neumann--Kelvin Panel Method}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+\vspace{-16mm}
+
+\begin{center}
+\begin{minipage}{0.9\textwidth}
+\small
+\textbf{Verification report on the \texttt{wave-resistance} code.}\\[2mm]
+Repository: \url{https://github.com/ignaziomviola/wave-resistance}\\
+Commit reviewed: \texttt{COMMITSHA}\\
+Report compiled: REPORTDATE
+\end{minipage}
+\end{center}
+
+\vspace{4mm}
+\begin{abstract}
+\noindent
+ABSTRACTBODY
+\end{abstract}
+
+\noindent\textbf{Key words:} wave resistance, Neumann--Kelvin problem, panel method,
+Kelvin Green function, Delft Systematic Yacht Hull Series, code verification.
+
+\section*{Nomenclature}
+\noindent
+\begin{tabular}{@{}ll@{\hspace{10mm}}ll@{}}
+$a$      & Michell amplitude, nondimensional      & $\bm{n}$ & unit normal, into the fluid\\
+$b$      & waterline beam                          & $p$      & pressure\\
+$c$      & waterline length                        & $\bm{r}$ & position vector\\
+$d$      & canoe-body draught                      & $u$      & speed of the onset flow\\
+$\mathcal{G}$ & Kelvin Green function              & $\bm{u}$ & velocity, $(u,v,w)$\\
+$g$      & gravitational acceleration              & $x,y,z$  & Cartesian coordinates\\
+$\mathcal{A}$ & free-wave amplitude                & $\lambda$ & $\sec\theta$, wave parameter\\
+$k_0$    & wavenumber scale, $g/u^2$               & $\theta$ & wave propagation angle\\
+$W$      & displacement weight                     & $\rho$   & fluid density\\
+$N$      & number of panels                        & $\sigma$ & source density\\
+$R$      & resistance                              & $\phi$   & disturbance potential\\
+$S$      & wetted surface                          & $\Phi$   & total potential\\
+$\nabla_c$ & displaced volume of the canoe body    & $\Gamma$ & waterline, $S\cap\{z=0\}$\\
+\end{tabular}
+
+\vspace{3mm}
+\noindent
+\begin{tabular}{@{}ll@{}}
+DSYHS & Delft Systematic Yacht Hull Series\\
+IGES  & Initial Graphics Exchange Specification\\
+ITTC  & International Towing Tank Conference\\
+NURBS & Non-Uniform Rational B-Spline\\
+$\Fn$ & Froude number, $u/\sqrt{gc}$\\
+$Re$  & Reynolds number, $uc/\nu$\\
+\end{tabular}
+
+\section{Introduction}
+INTRO
+
+\section{Methodology}
+METHOD
+
+\section{Verification}
+VERIF
+
+\section{Results}
+RESULTS
+
+\section{Capabilities and Limitations}
+CAPLIM
+
+\section{Conclusions}
+CONCL
+
+\begin{thebibliography}{9}
+\bibitem[Gerritsma et al.(1981)]{gerritsma1981}
+Gerritsma, J., Onnink, R. \& Versluis, A. 1981
+Geometry, resistance and stability of the Delft Systematic Yacht Hull Series.
+\textit{International Shipbuilding Progress} \textbf{28}, 276--297.
+
+\bibitem[Keuning \& Katgert(2008)]{keuning2008}
+Keuning, J. A. \& Katgert, M. 2008
+A bare hull resistance prediction method derived from the results of the Delft
+Systematic Yacht Hull Series extended to higher speeds.
+In \textit{International Conference on Innovation in High Performance Sailing Yachts},
+Lorient.
+
+\bibitem[Michell(1898)]{michell1898}
+Michell, J. H. 1898
+The wave-resistance of a ship.
+\textit{Philosophical Magazine, Series 5} \textbf{45}, 106--123.
+
+\bibitem[Newman(1987)]{newman1987}
+Newman, J. N. 1987
+Evaluation of the wave-resistance Green function: Part 1 --- the double integral.
+\textit{Journal of Ship Research} \textbf{31}, 79--90.
+
+\bibitem[Noblesse(1981)]{noblesse1981}
+Noblesse, F. 1981
+Alternative integral representations for the Green function of the theory of ship
+wave resistance.
+\textit{Journal of Engineering Mathematics} \textbf{15}, 241--265.
+
+\bibitem[den Ouden(2022a)]{dsyhs_hydro}
+den Ouden, J. 2022
+Delft Systematic Yacht Hull Series hydrostatics data.
+4TU.ResearchData, \url{https://doi.org/10.4121/21501375}.
+
+\bibitem[den Ouden(2022b)]{dsyhs_meas}
+den Ouden, J. 2022
+Delft Systematic Yacht Hull Series measurement data.
+4TU.ResearchData, \url{https://doi.org/10.4121/21501402}.
+
+\bibitem[Piegl \& Tiller(1997)]{piegl1997}
+Piegl, L. \& Tiller, W. 1997
+\textit{The NURBS Book}, 2nd edn. Springer.
+
+\bibitem[Wehausen(1973)]{wehausen1973}
+Wehausen, J. V. 1973
+The wave resistance of ships.
+\textit{Advances in Applied Mechanics} \textbf{13}, 93--245.
+\end{thebibliography}
+
+\end{document}

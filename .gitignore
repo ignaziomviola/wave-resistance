@@ -6,3 +6,8 @@ dist/
 *.egg-info/
 .venv/
 *.npz
+
+# LaTeX build artefacts
+docs/report/*.aux
+docs/report/*.log
+docs/report/*.out
