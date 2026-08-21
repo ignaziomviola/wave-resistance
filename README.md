@@ -87,11 +87,25 @@ positive-definite in σ, so discretisation error can only inflate it and never c
 cent of noise on the density doubles it, while the pressure route moves by two. **Quote the
 pressure route**, with the far-field value beside it as an upper bound.
 
-On Sysser 01 at Fn = 0.30, static attitude, 480 panels, the pressure route gives 0.921 N
-against a measured residuary resistance of 1.134 N, a ratio of 0.81 — and residuary resistance
-is a proxy that also contains nonlinear and viscous-form contributions, so the wave resistance
-it brackets is below 1.134 N. The far-field route gives 2.92 N, still carrying its one-sided
-bias.
+On Sysser 01 the comparison against measurement is **not achieved**, and it is worth being
+precise about why. At Fn = 0.30 the pressure route gives 0.90 N against a measured residuary
+resistance of 1.134 N — a ratio of 0.80, which looks like a validation and is not. Run at every
+speed on the same mesh, the ratio spans 0.28 to 3.15, and the predicted curve peaks near
+Fn = 0.35–0.40 and falls while the measurement rises monotonically. One point in a scatter of
+a factor of four is not evidence of accuracy.
+
+Two independent obstructions were found, with disjoint ranges, and between them they cover the
+whole useful speed range. Below Fn ≈ 0.35 the measured residuary resistance is under 0.6 % of
+displacement weight, so the discretisation error the compute budget permits is comparable to
+the signal — at Fn = 0.25 the prediction is negative. Above Fn ≈ 0.40 the target is large, but
+the running attitude cannot be applied: the release does not say where the sinkage was
+measured, and the resulting heave ambiguity reaches 44 mm at Fn = 0.50 against a 31 mm
+sinkage. Running at the static attitude instead makes the hull too shallow, so the prediction
+undershoots, monotonically, to 0.28 of measurement at Fn = 0.50.
+
+The most useful next step is therefore not a bigger mesh but the reference point for the
+measured sinkage, which would open the range where an error would actually be visible. See
+`docs/formulation.md` section 23.
 
 Throughput is 1164 microseconds per panel pair on a real Sysser 01 mesh, against 928 before
 the kernel correction, so the fix cost 25 per cent. Against the 10-minute assembly budget

@@ -1007,3 +1007,62 @@ The far-field route remains 2.58 times the measurement, consistent with the one-
 §16.1 and with the source-panel quadrature bias of §18.3 — neither of which the flux
 constraint addresses. **The pressure route is the one to quote**, with the far-field value
 beside it as an upper bound.
+
+## 23. Across speed the agreement does not hold, and the Fn = 0.30 point was luck
+
+§22.1 reported the constrained pressure route at 0.921 N against a measured residuary
+resistance of 1.134 N, a ratio of 0.81. Run at every speed on the same 480-panel mesh, static
+attitude, that ratio is not representative:
+
+| $Fn$ | 0.25 | 0.30 | 0.35 | 0.40 | 0.45 | 0.50 |
+|---|---|---|---|---|---|---|
+| $R_r$ measured, N | 0.527 | 1.134 | 2.266 | 6.632 | 15.503 | 27.976 |
+| $R_W$ pressure, flux = 0, N | −0.388 | 0.904 | 7.147 | 12.756 | 7.741 | 7.859 |
+| pressure / $R_r$ | −0.74 | **0.80** | 3.15 | 1.92 | 0.50 | 0.28 |
+| $R_W$ far-field, flux = 0, N | 1.449 | 2.946 | 16.269 | 15.207 | 11.077 | 9.834 |
+| far-field / $R_r$ | 2.75 | 2.60 | 7.18 | 2.29 | 0.71 | 0.35 |
+
+The ratio spans 0.28 to 3.15, and the predicted curve **peaks near $Fn = 0.35$–$0.40$ and then
+falls** while the measurement rises monotonically through $Fn = 0.50$. **The agreement at
+$Fn = 0.30$ is therefore one point in a scatter of a factor of four, and quoting it as
+validation would be wrong.** It is recorded here because the temptation to quote it is
+exactly what this section exists to prevent.
+
+Three things are wrong, and they are separable.
+
+**The attitude is wrong at the top of the range, and known to be.** At $Fn = 0.50$ the model
+sinks 30.8 mm — a quarter of the canoe-body draught — and trims 3.2° bow-up. The sweep runs at
+the static attitude because §21 shows the measured one cannot be applied there: the heave
+ambiguity from the unstated sinkage datum is 44 mm, larger than the sinkage itself. A hull run
+27 mm too shallow makes far less wave, so the prediction *must* undershoot at high speed, and
+it does, monotonically: 1.92, 0.50, 0.28 at $Fn = 0.40$, 0.45, 0.50. This is not a defect of
+the method; it is the consequence of a condition the published data does not determine.
+
+**The $Fn = 0.35$ point is an outlier and probably an artefact.** It breaks the trend from both
+sides — 2.60 at $Fn = 0.30$, 7.18 at 0.35, 2.29 at 0.40 by the far-field route — where the
+measured curve is smooth. A real interference hump would appear in the measurement too. The
+body residual there, 0.0306, is no worse than its neighbours, so the diagnostics do not flag
+it, which is itself worth knowing: **the residual and the flux do not catch everything.**
+
+**The low-speed end is dominated by its own error.** At $Fn = 0.25$ the target is 0.527 N,
+0.14 per cent of displacement weight, and the pressure route returns $-0.388$ N. A negative
+wave resistance is unphysical and says plainly that the discretisation error exceeds the
+signal there. It is reported rather than clipped, for the same reason §20 keeps the negative
+measured residuary at $Fn = 0.10$.
+
+### 23.1 What M4 concludes
+
+- **The hydrostatics reconcile** against the primary release, to 0.06 per cent in displacement
+  and waterplane area, with a stated and attributed geometry-provenance discrepancy of 0.5 to
+  2.1 per cent in $L_{wl}$, $B_{wl}$ and $S_c$ (§19).
+- **The measurements are extracted and reduced** with their conventions and assumptions
+  recorded, including which are corroborated and which are not (§20).
+- **The resistance comparison is not achieved.** Not because it was not attempted, but because
+  two independent obstructions were found: the mesh resolution the compute budget allows leaves
+  errors comparable to the signal at low $Fn$, and the published data does not determine the
+  running attitude at high $Fn$. The two obstructions have disjoint ranges of validity and
+  together they cover the whole useful speed range.
+
+The single most useful next step is not a bigger mesh. It is to obtain the reference point for
+the measured sinkage, which would open the $Fn \ge 0.40$ range where the target is large and
+where an error in the prediction would actually be visible against it.
