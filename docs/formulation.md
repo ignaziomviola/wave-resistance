@@ -681,6 +681,14 @@ density error, while $A$ itself is a strongly cancelling oscillatory integral. A
 falling from 10 to 4 per cent is therefore entirely compatible with a resistance that is
 still dominated by its own error term.
 
+> **Superseded by §22.1.** The reading above is half right. The one-sided bias is real, but
+> the *swing* is not intrinsic to it: almost all of it was a single spurious mode, a net source
+> flux the solve had no reason to suppress. With that mode constrained away both routes
+> converge on this same mesh sequence, at $+5.8$ and $+2.9$ per cent on the last refinement.
+> The table and conclusions in this section are the unconstrained solve, kept because they are
+> what the diagnosis was built from, and because a resistance that swings while its residual
+> falls is the symptom that led to the mode. Read §22 for what the method now delivers.
+
 ### 18.2 What is and is not established
 
 Established, on cases with analytic answers:
@@ -693,12 +701,14 @@ Established, on cases with analytic answers:
 - the wave-kernel quadrature is accurate to 7.0e-4 in the worst case and 6e-11 in the median
   over the region a Sysser mesh spans.
 
-Not established:
+Not established *by the unconstrained solve*:
 
 - **a converged wave resistance for Sysser 01.** At every panel count the ten-minute
   assembly budget allows, the far-field resistance is dominated by discretisation error.
   This is not a presentational matter and it is not resolved by choosing a mesh whose answer
-  looks plausible.
+  looks plausible. §22.1 revisits this: with the net source flux constrained, both routes do
+  converge on this mesh sequence, and the pressure route lands at 0.81 of the measured
+  residuary resistance.
 
 ### 18.3 The source-panel quadrature is a second, separate bias
 
@@ -964,6 +974,36 @@ square solve. One consequence to note: removing the monopole removes low-$\lambd
 the *share* of the spectrum beyond the mesh's resolved $\lambda$ rises — from 4 to 14 per cent
 on a 160-panel Sysser mesh. The absolute tail is unchanged; it is the denominator that shrank.
 
-This does not overturn §18's conclusion that the Sysser 01 resistance is unconverged at these
-panel counts — 4.16 to 2.76 N between 160 and 280 panels is a 34 per cent change, not a
-converged sequence. It removes the largest single error term, which is a different claim.
+### 22.1 It also makes the sequence converge, which §18 said it did not
+
+The 480-panel level, which was still running when the above was written, changes the
+conclusion of §18 rather than merely improving its numbers. Sysser 01 at $Fn = 0.30$, static
+attitude, measured residuary 1.134 N:
+
+| panels | 160 | 280 | 480 | last step |
+|---|---|---|---|---|
+| $R_W$ far-field, unconstrained | 45.46 | 12.82 | 29.07 N | ×2.3, not monotone |
+| $R_W$ far-field, flux = 0 | 4.163 | 2.761 | **2.922 N** | **+5.8 %** |
+| $R_W$ pressure, unconstrained | 10.15 | 4.69 | 8.40 N | ×1.8, not monotone |
+| $R_W$ pressure, flux = 0 | 0.504 | 0.895 | **0.921 N** | **+2.9 %** |
+| body residual, flux = 0 | 0.0888 | 0.0910 | **0.0234** | |
+
+**§18.1's finding is superseded.** It reported that the solution converged while the
+resistance did not, and read that as the positive bias of §16.1 dominating. Half of that was
+right: the bias is real and the far-field route still sits 2.58 times the measured residuary.
+But the swing itself was not intrinsic — it was the flux mode, and with the mode removed both
+routes converge, at $+5.8$ and $+2.9$ per cent on the last refinement. That is close to the
+plan's V10 threshold of 1 per cent between successive levels rather than hopelessly far from
+it, and the body residual at 480 panels is 0.0234 of $u$ against V12's 0.01.
+
+Against the measurement, the constrained pressure route gives **0.921 N against 1.134 N
+measured, a ratio of 0.81**. Two things make that better than it looks rather than worse.
+Residuary resistance is not wave resistance: it carries nonlinear and viscous-form
+contributions as well, so the wave resistance it brackets is *below* 1.134 N and 0.921 N is
+nearer than the ratio suggests. And $Fn = 0.30$ is the speed at which the target is smallest,
+0.31 per cent of displacement weight (§20), so it is where any prediction is hardest.
+
+The far-field route remains 2.58 times the measurement, consistent with the one-sided bias of
+§16.1 and with the source-panel quadrature bias of §18.3 — neither of which the flux
+constraint addresses. **The pressure route is the one to quote**, with the far-field value
+beside it as an upper bound.
