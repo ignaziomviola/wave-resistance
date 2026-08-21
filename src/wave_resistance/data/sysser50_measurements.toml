@@ -1,0 +1,75 @@
+# Towing-tank measurements for DSYHS Sysser 50, bare hull upright, model scale.
+#
+# PROVENANCE.  Transcribed from the block headed "Bare hull upright" on the sheet "Sys 50" of
+# DSYHS_all_measurements_modelscale.xlsx, from
+#   https://doi.org/10.4121/21501402  (4TU.ResearchData, CC0, Jasper den Ouden, 2022-11-17)
+# downloaded as https://ndownloader.figshare.com/files/38098659 and verified against the
+# release's published MD5 bee3ba22dc5c3f097c03609a2372b60e.
+#
+# WATER PROPERTIES.  The workbook records the tank temperature, 19.9 C, and leaves its rho and
+# nu cells at zero, so both are computed: rho = 998.227 kg/m^3 from the standard fifth-order
+# fit for fresh water and nu = 1.00879e-6 m^2/s from
+# nu = 1.7688e-6/(1 + 0.03368 T + 0.00021 T^2).  Sysser 01 was towed at 17.3 C, so the two
+# hulls are not compared at equal Reynolds number for a given Froude number.
+#
+# RESIDUARY RESISTANCE is not in the release; it follows from Rt by subtracting an ITTC-57
+# friction line at k = 0, so it contains wave resistance together with nonlinear and
+# viscous-form contributions and is a proxy for the wave resistance, not a measurement of it.
+#
+# THE SINKAGE DATUM IS STATED, and this file records where.  The release's "Info" sheet
+# defines the channel z as the "Vertical displacement of center of gravity with respect to
+# zero speed, parallel to towing tank z-axis, positive down", and theta as the "Pitch angle of
+# hull with respect to zero speed ... Bow down positive".  The reference point for the sinkage
+# is therefore the centre of gravity, and the trim pivot is the same point.  An earlier note in
+# this repository recorded the reference point as unstated; that is withdrawn, and
+# docs/formulation.md section 21 is superseded by it.
+#
+# WHERE THE CENTRE OF GRAVITY IS.  The Info sheet does not give its position, but a model
+# ballasted to float upright at zero trim carries it over the longitudinal centre of buoyancy,
+# so x_CoG = lcb.  That is not merely a physical argument: for the nine series-1 hulls the
+# workbook's own transducer offsets are asymmetric, and their midpoint reproduces -lcb to
+# 5 decimal places on seven of the nine and to 0.16 mm on the other two, which fixes the CoG
+# at the lcb given transducers mounted symmetrically about the waterline midpoint.  For
+# Sysser 50, and for every hull from number 10 onwards, the offsets are entered as round
+# nominal values, +/-0.5 m or +/-0.7 m, and so carry no information either way.
+#
+# The vertical position of the pivot does not matter.  Rotating about a point displaced
+# vertically by dz from the true pivot differs from the correct motion by a surge of dz sin
+# theta, which no wave resistance depends on, and a heave of dz (1 - cos theta), which is
+# 0.19 mm for dz = 0.1 m at the largest trim in this table.  Only the pivot's x matters.
+#
+# SIGN OF z, UNRESOLVED.  The Info sheet states that z is positive down, so a negative entry
+# means the centre of gravity rose.  Every entry below is negative and the sequence turns
+# round at 2.22 m/s, returning towards zero at the highest speeds.  Read as stated, the model
+# rises throughout and rises most at Fn = 0.50; read with the opposite sign, it sinks
+# throughout, deepest at Fn = 0.50, and then lifts as it begins to plane, which is the
+# classical squat behaviour of a displacement hull.  The second reading is the physical one
+# and is what `sysser50_runs` applies, in agreement with the sign this repository has always
+# used for Sysser 01.  The conflict with the Info sheet is recorded rather than hidden: it is
+# a question for the dataset's authors, and it inverts the sinkage if resolved the other way.
+#
+# ATTITUDE MAGNITUDE.  The model sinks 21.9 mm and trims 2.11 deg bow-up by Fn = 0.50 against
+# a canoe-body draught of 94.6 mm, so the sinkage is 23 per cent of the draught.  Sysser 50 is
+# a shallower hull than Sysser 01 and the same absolute sinkage matters more.
+
+[sysser50.conditions]
+source = "4TU.ResearchData 10.4121/21501402, DSYHS_all_measurements_modelscale.xlsx, sheet 'Sys 50'"
+md5 = "bee3ba22dc5c3f097c03609a2372b60e"
+licence = "CC0"
+block = "Bare hull upright"
+temperature_c = 19.9
+density = 998.227            # kg/m^3, computed from the temperature
+viscosity = 1.00879e-6       # m^2/s, computed from the temperature
+towing_point_above_waterline_mm = 258.0
+distance_forward_transducer_to_cog = 0.5     # m, nominal: entered as a round value
+distance_aft_transducer_to_cog = -0.5        # m, nominal: entered as a round value
+
+[sysser50.bare_hull_upright]
+speed = [0.441, 0.664, 0.8855, 1.109, 1.3296, 1.55, 1.77, 1.99, 2.22, 2.439, 2.659,
+         2.8798, 3.0994]
+total_resistance = [0.459738, 1.01145, 1.79798, 2.96605, 4.69566, 7.4538, 13.0617,
+                    23.8431, 37.3228, 47.2768, 56.9019, 63.1404, 67.6855]
+sinkage_mm = [-0.4647, -1.4946, -2.6755, -4.4924, -6.69715, -10.1873, -14.7824, -19.5835,
+              -21.8738, -20.9575, -18.9676, -16.2092, -13.2016]
+trim_deg = [-0.00892177, -0.0194642, -0.0323066, -0.0462131, -0.0859722, -0.189386,
+            -0.469991, -1.1962, -2.11223, -2.67013, -3.11814, -3.34353, -3.48118]

@@ -117,6 +117,27 @@ class NurbsSurface:
     closed_v: bool = False
     is_polynomial: bool = True
 
+    def transposed(self) -> "NurbsSurface":
+        """The same surface with its u and v parameters exchanged.
+
+        The geometry is untouched: only which parameter is called first changes.  This
+        exists because the DSYHS geometry release is not consistent about it -- the
+        Sysser 01 file parameterises girth first and length second, the Sysser 50 file the
+        other way round -- while a body-fitted mesh has to know which is which.  Detecting
+        the convention and transposing once, on loading, keeps that knowledge in one place
+        instead of spreading a flag through every meshing routine.
+        """
+        return NurbsSurface(
+            degree_u=self.degree_v, degree_v=self.degree_u,
+            knots_u=self.knots_v, knots_v=self.knots_u,
+            control_points=self.control_points.transpose(1, 0, 2),
+            weights=self.weights.T,
+            u_range=self.v_range, v_range=self.u_range,
+            de_pointer=self.de_pointer, form=self.form, label=self.label,
+            closed_u=self.closed_v, closed_v=self.closed_u,
+            is_polynomial=self.is_polynomial,
+        )
+
     def __post_init__(self) -> None:
         n_u, n_v = self.control_points.shape[:2]
         if self.control_points.shape != (n_u, n_v, 3):

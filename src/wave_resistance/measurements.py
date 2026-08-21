@@ -14,10 +14,10 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from .reference import load_reference
+from .reference import hull_reference, load_reference
 
 __all__ = ["Run", "ittc57_friction_coefficient", "fresh_water_density",
-           "fresh_water_viscosity", "sysser01_runs"]
+           "fresh_water_viscosity", "hull_runs", "sysser01_runs", "sysser50_runs"]
 
 GRAVITY = 9.80665
 
@@ -74,17 +74,23 @@ class Run:
     _weight_fraction: float = 0.0
 
 
-def sysser01_runs(length: float | None = None, wetted_area: float | None = None,
-                  volume: float | None = None) -> list[Run]:
-    """The Sysser 01 bare-hull upright runs, reduced.
+def hull_runs(sysser: int, length: float | None = None, wetted_area: float | None = None,
+              volume: float | None = None) -> list[Run]:
+    """The bare-hull upright runs of one Sysser hull, reduced.
 
     ``length``, ``wetted_area`` and ``volume`` default to the official hydrostatics, so the
     reduction uses the same geometry the series used rather than anything this code computed.
+
+    The sinkage sign is the one discussed at length in each hull's measurements data file:
+    the workbook's z is taken as negative-means-deeper, which is the classical squat
+    behaviour, and which contradicts the release Info sheet's "positive down". The conflict
+    is recorded there rather than resolved here.
     """
-    data = load_reference("sysser01_measurements.toml")["sysser01"]
+    key = f"sysser{sysser:02d}"
+    data = load_reference(f"{key}_measurements.toml")[key]
     cond = data["conditions"]
     rows = data["bare_hull_upright"]
-    hydro = load_reference("sysser01_reference.toml")["sysser01"]
+    hydro = hull_reference(sysser)
     length = hydro["lwl"] if length is None else length
     wetted_area = hydro["wetted_area"] if wetted_area is None else wetted_area
     volume = hydro["volume"] if volume is None else volume
@@ -109,3 +115,41 @@ def sysser01_runs(length: float | None = None, wetted_area: float | None = None,
             _weight_fraction=residuary / weight,
         ))
     return runs
+
+
+def trim_pivot_x(sysser: int, waterline_midpoint: float) -> float:
+    """Longitudinal position of the trim pivot, in the geometry's own x coordinate.
+
+    The release's Info sheet defines the measured sinkage as the vertical displacement of
+    the centre of gravity and the trim as the pitch of the hull, so the rigid motion is a
+    rotation about the centre of gravity followed by a heave of that point. The pivot is
+    therefore the centre of gravity, and a model ballasted to float upright at zero trim
+    carries it over the longitudinal centre of buoyancy, so its x is ``lcb`` measured from
+    the midpoint of the upright waterline.
+
+    That is confirmed by the data and not only argued: on the nine series-1 hulls the
+    workbook's transducer offsets are asymmetric, and their midpoint reproduces -``lcb`` to
+    five decimal places on seven of them and to 0.16 mm on the other two. From hull 10
+    onwards the offsets are entered as round nominal values and carry no information.
+
+    ``waterline_midpoint`` converts the datum: ``lcb`` is measured from the midpoint of the
+    upright waterline, while meshes are built in the geometry's own coordinates.
+
+    Only the pivot's x matters. Displacing the pivot vertically by dz changes the motion by
+    a surge of dz sin(trim), which no wave resistance depends on, and a heave of
+    dz (1 - cos(trim)), which is 0.19 mm for dz = 0.1 m at the largest trim in either
+    hull's table.
+    """
+    return waterline_midpoint + hull_reference(sysser)["lcb"]
+
+
+def sysser01_runs(length: float | None = None, wetted_area: float | None = None,
+                  volume: float | None = None) -> list[Run]:
+    """The Sysser 01 bare-hull upright runs, reduced."""
+    return hull_runs(1, length, wetted_area, volume)
+
+
+def sysser50_runs(length: float | None = None, wetted_area: float | None = None,
+                  volume: float | None = None) -> list[Run]:
+    """The Sysser 50 bare-hull upright runs, reduced."""
+    return hull_runs(50, length, wetted_area, volume)

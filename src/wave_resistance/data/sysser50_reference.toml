@@ -1,0 +1,58 @@
+# Official model-scale hydrostatics for DSYHS Sysser 50, read directly from the primary
+# release.
+#
+# PROVENANCE.  Every value below is transcribed from the row `Sysser = 50` of the sheet
+# "Canoe body hydrostatics" in DSYHS_hydrostatics_modelscale.xlsx, from
+#   https://doi.org/10.4121/21501375  (4TU.ResearchData, CC0, Jasper den Ouden, 2022-11-17)
+# downloaded as https://ndownloader.figshare.com/files/38098641 and verified against the
+# release's published MD5 8d041601483f5d165d2198446eb7f4de.  Conventions are those of the
+# release's own "Info" sheet, as recorded in sysser01_reference.toml.
+#
+# DATUM.  lcb and lcf are measured from the midpoint of the *upright* waterline, negative
+# aft.  The heeled columns hold volc10 = volc20 = volc30 = volc0 exactly, so they were
+# computed at constant displacement with sinkage and trim solved for.
+#
+# Internal consistency, checked rather than assumed: cb = volc/(lwl bwl tc) = 0.4187456,
+# cm = am/(bwl tc) = 0.7773080, cp = volc/(am lwl) = 0.5387126 and
+# cw = aw/(lwl bwl) = 0.6879333 all reproduce the release's own cb0, cm0, cp0 and cw0.
+#
+# WHY THIS HULL.  Sysser 50 belongs to series 4 and is the extreme of the series in beam
+# for its draught: bwl/tc is 6.34 against 3.99 for the series parent Sysser 01, and lcb
+# sits 7.9 per cent of the waterline length aft of midships against 2.3 per cent.  It is
+# therefore the hardest case in the series for a method whose errors grow with beam, which
+# is what makes it worth running.
+
+[sysser50]
+source = "4TU.ResearchData 10.4121/21501375, DSYHS_hydrostatics_modelscale.xlsx, row Sysser=50"
+md5 = "8d041601483f5d165d2198446eb7f4de"
+licence = "CC0"
+series = 4
+overhang = 1                # 1 = original overhang (Info sheet)
+heel_deg = 0.0
+lwl = 2.000000              # m
+bwl = 0.600000              # m
+tc = 0.094600               # m, maximum canoe-body draught
+volume = 0.0475360          # m^3, canoe-body volume
+wetted_area = 0.916960      # m^2
+waterplane_area = 0.825520  # m^2
+midship_area = 0.0441200    # m^2, maximum sectional area
+lcb = -0.158000             # m, from the midpoint of the upright waterline, aft negative
+lcf = -0.182800             # m, same datum
+cb = 0.41874558648754
+cm = 0.77730791576063
+cp = 0.53871262339813
+cwp = 0.6879332884974
+
+# Heeled conditions, at the same displacement.  Kept for the deferred heeled work (M5); the
+# lcb and lcf datum remains the upright half-waterline point.
+[sysser50.heeled]
+heel_deg = [10.0, 20.0, 30.0]
+lwl = [2.07680, 2.13080, 2.14080]
+bwl = [0.58700, 0.54740, 0.50820]
+tc = [0.10420, 0.12080, 0.13140]
+volume = [0.0475360, 0.0475360, 0.0475360]
+wetted_area = [0.904320, 0.871600, 0.843400]
+waterplane_area = [0.817000, 0.772760, 0.738360]
+midship_area = [0.0431600, 0.0422400, 0.0420000]
+lcb = [-0.158200, -0.158400, -0.158200]
+lcf = [-0.180600, -0.162000, -0.143400]

@@ -363,6 +363,22 @@ class TriMesh:
         return PlaneSection(area, centroid, np.stack([start, end], axis=1), float(length.sum()))
 
 
+def _length_runs_first(patch: NurbsSurface) -> bool:
+    """True when the patch's *first* parameter runs along the hull rather than around it.
+
+    Measured on the control net, which bounds the surface by the convex-hull property: the
+    mean span of x along the first index against the mean span along the second.  The
+    longitudinal direction wins by a large margin on a hull -- a factor of six on the
+    Sysser 50 file and a factor of 20 the other way on Sysser 01 -- so the test is not
+    delicate.  It is a test on x alone because the hull's long axis is x by the frame
+    convention of docs/formulation.md section 1.
+    """
+    cp = patch.control_points
+    along_first = float(np.mean(np.ptp(cp[:, :, 0], axis=0)))
+    along_second = float(np.mean(np.ptp(cp[:, :, 0], axis=1)))
+    return along_first > along_second
+
+
 def tessellate(surface: NurbsSurface, n_u: int, n_v: int) -> TriMesh:
     """Uniform parametric tessellation of one patch into a TriMesh."""
     if n_u < 1 or n_v < 1:
@@ -412,6 +428,15 @@ class Hull:
             # The patch with the largest control-net bounding box is the canoe body.
             spans = [np.prod(p.bounding_box()[1] - p.bounding_box()[0] + 1e-12) for p in patches]
             wetted_patches = (int(np.argmax(spans)),)
+        # The DSYHS release is not consistent about which surface parameter runs along the
+        # hull: the Sysser 01 file puts girth first, the Sysser 50 file length first.  A
+        # body-fitted mesh has to know, so detect it and transpose once, here, rather than
+        # thread a flag through the meshing code.  Detected from the control net: the
+        # longitudinal parameter is the one along which x varies more.
+        patches = [
+            (p.transposed() if i in wetted_patches and _length_runs_first(p) else p)
+            for i, p in enumerate(patches)
+        ]
         if mirror is None:
             lo, hi = patches[wetted_patches[0]].bounding_box()
             mirror = bool(lo[1] >= -1e-9 or hi[1] <= 1e-9)
