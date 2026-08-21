@@ -12,7 +12,8 @@ from _shapes import box_mesh, icosphere
 from wave_resistance.hull import Hull, TriMesh
 from wave_resistance.nk import (
     _mirrored_in_z, check_envelope, influence_matrix, pressure_resistance,
-    rankine_with_image_matrix, solve_nk, wave_influence_matrix, x_velocity_matrix,
+    rankine_with_image_matrix, solve_nk, solve_with_zero_net_flux, wave_influence_matrix,
+    x_velocity_matrix,
 )
 from wave_resistance.panels import rankine_normal_velocity_matrix
 from wave_resistance.wigley import wigley_mesh
@@ -191,3 +192,60 @@ def test_pressure_and_far_field_resistance_agree(sysser01_hull):
     pressure = pressure_resistance(mesh, result.sigma, speed, k0, order=1)
     assert pressure > 0.0
     assert result.resistance == pytest.approx(pressure, rel=0.25)
+
+def test_the_flux_constraint_is_satisfied_exactly():
+    rng = np.random.default_rng(0)
+    a = rng.standard_normal((30, 30)) + 6.0 * np.eye(30)
+    rhs = rng.standard_normal(30)
+    areas = rng.uniform(0.1, 1.0, 30)
+    x = solve_with_zero_net_flux(a, rhs, areas)
+    assert abs(float(areas @ x)) < 1e-12 * float(np.abs(areas).sum() * np.abs(x).max())
+    # It is a least-squares solution over the feasible subspace, so no feasible perturbation
+    # can reduce the residual.
+    base = np.linalg.norm(a @ x - rhs)
+    q, _ = np.linalg.qr(areas.reshape(-1, 1), mode="complete")
+    for direction in q[:, 1:].T[:6]:
+        for step in (1e-3, -1e-3):
+            trial = x + step * direction
+            assert np.linalg.norm(a @ trial - rhs) >= base - 1e-12
+
+
+def test_the_flux_constraint_is_a_null_operation_on_a_well_resolved_body():
+    """A thin Wigley hull already emits almost nothing, 1.0e-4 of u S, so constraining it must
+    barely move the answer.  A constraint that changed a converged result would be suspect."""
+    mesh = wigley_mesh(1.0, 0.02, 0.0625, n_x=12, n_z=4)
+    speed = 0.30 * np.sqrt(GRAV * 1.0)
+    k0 = GRAV / speed ** 2
+    a = influence_matrix(mesh, k0, wave=True, order=1)
+    rhs = speed * mesh.unit_normals()[:, 0]
+    area = mesh.areas()
+    free = np.linalg.solve(a, rhs)
+    tied = solve_with_zero_net_flux(a, rhs, area)
+    assert abs(np.sum(free * area)) / (speed * area.sum()) < 1e-3
+    assert abs(np.sum(tied * area)) / (speed * area.sum()) < 1e-12
+    assert np.linalg.norm(tied - free) < 0.05 * np.linalg.norm(free)
+
+
+@pytest.mark.slow
+def test_the_flux_constraint_removes_a_spurious_mode_on_a_beamy_hull(sysser01_hull):
+    """The measurement that makes the constraint the default.
+
+    On Sysser 01 at 160 panels the unconstrained solve leaves 8.1 per cent of u S, and
+    imposing the constraint takes the far-field resistance from 45.46 N to 4.16 N.  The reason
+    to trust that rather than suspect it is that the off-collocation body residual *improves*,
+    from 0.135 to 0.089 of u: a constraint that deleted real physics would degrade it.
+    """
+    hull = sysser01_hull.with_datum_shift(0.127078)
+    mesh = hull.waterline_fitted_mesh(4, 14, first_depth=0.010)
+    lwl = 1.600000
+    speed = 0.30 * np.sqrt(GRAV * lwl)
+
+    free = solve_nk(mesh, speed, lwl, order=1, spectrum_order=3, check_points=32,
+                    zero_net_flux=False)
+    tied = solve_nk(mesh, speed, lwl, order=1, spectrum_order=3, check_points=32,
+                    zero_net_flux=True)
+
+    assert free.net_source_flux > 0.05
+    assert tied.net_source_flux < 1e-12
+    assert tied.resistance < 0.2 * free.resistance
+    assert tied.body_residual_rms < free.body_residual_rms

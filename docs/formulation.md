@@ -908,3 +908,62 @@ not change. That reasoning is wrong. In linearised theory the hull is clipped at
 its own making, so the volume below $z = 0$ genuinely exceeds the static value and by a large
 margin — 150 per cent of it at $Fn = 0.50$ with a mid-hull pivot. That is the linearisation's
 own bookkeeping and carries no information about the pivot.
+
+## 22. Constraining the net source flux, which is worth a factor of ten
+
+Section 16.1 showed that the far-field integral is positive-definite in $\sigma$ and that
+incoherent error can only inflate it, and §18.1 showed the Sysser 01 resistance swinging by
+3.5 while the body residual fell steadily. This section identifies the mode responsible and
+removes it.
+
+**The mode.** A closed body in a stream emits no net source strength, and the free surface can
+carry only a little, so $\int_S \sigma\,\mathrm{d}S$ should very nearly vanish. On the two
+cases that verify well it does: $1.0\times10^{-4}$ of $u S$ on a thin Wigley hull at 278
+panels and $1.3\times10^{-4}$ on a submerged sphere at 320. On Sysser 01 it is
+$8.1\times10^{-2}$ at 160 panels and $3.4\times10^{-2}$ at 280 — two to three orders larger.
+
+That matters far more than its size suggests. A spurious net source is a **monopole**, and its
+far-field amplitude does not fall off with $\lambda$ the way a closed body's does, while the
+resistance integrand carries $\lambda^2(\lambda^2-1)^{-1/2}$ and is largest exactly where the
+monopole lives, at $\lambda \to 1$.
+
+**The remedy.** The square system cannot satisfy an extra constraint exactly, so solve the
+constrained least-squares problem — minimise $\|A\sigma - b\|$ subject to
+$\mathbf{a}^\mathsf{T}\sigma = 0$ with $\mathbf{a}$ the panel areas — by the null-space
+method. The trailing columns of the QR factorisation of $\mathbf{a}$ span the feasible
+subspace; there is nothing to tune.
+
+**What it does.** Sysser 01 at $Fn = 0.30$, static attitude, measured residuary resistance
+1.134 N:
+
+| panels | | net flux | $R_W$ far-field | $R_W$ pressure | far-field / pressure | residual |
+|---|---|---|---|---|---|---|
+| 160 | unconstrained | 8.1e-2 | 45.46 N | 10.15 N | 4.48 | 0.1354 |
+| 160 | flux = 0 | 1.5e-17 | **4.16 N** | **0.504 N** | 8.25 | **0.0888** |
+| 280 | unconstrained | 3.4e-2 | 12.82 N | 4.69 N | 2.73 | 0.0962 |
+| 280 | flux = 0 | 4.5e-18 | **2.76 N** | **0.895 N** | 3.09 | **0.0910** |
+
+**Why this is a repair and not a fudge.** Three independent reasons.
+
+First, the off-collocation body residual **improves** — from 0.135 to 0.089 at 160 panels. A
+constraint that deleted real physics would degrade the body condition, since that residual is
+measured at points the solve never sees. It improves because the flux mode was violating the
+body condition too.
+
+Second, it is a **null operation where the flux is already small**. The submerged sphere's
+resistance changes in the sixth significant figure, the thin Wigley hull's by 0.1 per cent,
+and the residual of neither moves. A constraint that improved coarse answers by distorting
+them would distort the fine ones too.
+
+Third, the two constrained routes now **bracket the measurement** — 2.76 N and 0.895 N against
+1.134 N at 280 panels — where unconstrained they sat 4 to 40 times above it. And they close on
+each other under refinement, far-field over pressure going from 8.25 to 3.09.
+
+It is therefore the default in `solve_nk`, with `zero_net_flux=False` to recover the plain
+square solve. One consequence to note: removing the monopole removes low-$\lambda$ content, so
+the *share* of the spectrum beyond the mesh's resolved $\lambda$ rises — from 4 to 14 per cent
+on a 160-panel Sysser mesh. The absolute tail is unchanged; it is the denominator that shrank.
+
+This does not overturn §18's conclusion that the Sysser 01 resistance is unconverged at these
+panel counts — 4.16 to 2.76 N between 160 and 280 panels is a 34 per cent change, not a
+converged sequence. It removes the largest single error term, which is a different claim.

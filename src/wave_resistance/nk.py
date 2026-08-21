@@ -27,7 +27,7 @@ from .spectrum import (panel_quadrature, resistance_constant, wave_resistance_in
 
 __all__ = ["NKResult", "rankine_with_image_matrix", "wave_influence_matrix",
            "influence_matrix", "check_envelope", "velocity_matrix", "x_velocity_matrix",
-           "pressure_resistance", "solve_nk"]
+           "pressure_resistance", "solve_with_zero_net_flux", "solve_nk"]
 
 
 @dataclass
@@ -350,12 +350,50 @@ def _body_condition_residual(mesh: TriMesh, sigma: np.ndarray, k0: float, speed:
     return float(np.sqrt(np.mean(residual ** 2))), float(np.abs(residual).max())
 
 
+def solve_with_zero_net_flux(a: np.ndarray, rhs: np.ndarray, areas: np.ndarray
+                             ) -> np.ndarray:
+    """Least-squares solution of ``a x = rhs`` subject to ``areas . x = 0``.
+
+    A closed body in a stream emits no net source strength, and the free surface can carry
+    only a little, so the exact solution satisfies this to within a small residue.  The
+    discrete solution does not: on Sysser 01 at 160 panels the unconstrained solve leaves
+    8.1 per cent of u S, against 1.0e-4 on a thin Wigley hull and 1.3e-4 on a submerged
+    sphere.  That matters far more than its size suggests, because a spurious net source is a
+    monopole whose far-field amplitude does not fall off with lambda the way the true
+    amplitude does, while the resistance integrand carries lambda^2 (lambda^2-1)^(-1/2) and
+    so is largest exactly where the monopole lives.
+
+    Imposing the constraint on Sysser 01 at 160 panels takes the far-field resistance from
+    45.46 N to 4.16 N and the pressure value from 10.15 N to 0.50 N, and -- the reason to
+    trust it rather than to suspect it -- *improves* the off-collocation body residual from
+    0.135 to 0.089 of u.  A constraint that removed real physics would degrade it.  Where the
+    flux is already small the constraint is a null operation: the submerged sphere's
+    resistance changes in the sixth significant figure and the thin Wigley hull's by 0.1 per
+    cent, with the residual unchanged in both.
+
+    The square system cannot satisfy an extra constraint exactly, so this is the constrained
+    least-squares problem, solved by the null-space method: the trailing columns of the QR
+    factorisation of ``areas`` span the feasible subspace, and the residual is minimised over
+    it.  Exact, and with nothing to tune.
+    """
+    q, _ = np.linalg.qr(areas.reshape(-1, 1), mode="complete")
+    null_space = q[:, 1:]
+    reduced, *_ = np.linalg.lstsq(a @ null_space, rhs, rcond=None)
+    return null_space @ reduced
+
+
 def solve_nk(mesh: TriMesh, speed: float, length: float, rho: float = 1000.0,
              gravity: float = 9.80665, order: int = 1, spectrum_order: int = 4,
              rtol: float = 1e-4, check_points: int = 48,
              max_condition: float = 1e8, kernel_refine: float = 1.0,
-             lambda_cap: float | None = None) -> NKResult:
-    """Solve the Neumann-Kelvin problem on a mesh and report the wave resistance."""
+             lambda_cap: float | None = None, zero_net_flux: bool = True) -> NKResult:
+    """Solve the Neumann-Kelvin problem on a mesh and report the wave resistance.
+
+    ``zero_net_flux`` constrains the source distribution to emit none, which it should;
+    :func:`solve_with_zero_net_flux` gives the evidence and the measurements.  It defaults on
+    because it is a null operation on a well-resolved body and worth a factor of ten on a
+    coarsely resolved one.  Pass ``False`` to recover the plain square solve.
+    """
     k0 = gravity / speed ** 2
     a = influence_matrix(mesh, k0, wave=True, order=order, kernel_refine=kernel_refine)
     condition = float(np.linalg.cond(a))
@@ -369,7 +407,9 @@ def solve_nk(mesh: TriMesh, speed: float, length: float, rho: float = 1000.0,
             "rather than reported."
         )
     rhs = speed * mesh.unit_normals()[:, 0]
-    sigma = np.linalg.solve(a, rhs)
+    area = mesh.areas()
+    sigma = (solve_with_zero_net_flux(a, rhs, area) if zero_net_flux
+             else np.linalg.solve(a, rhs))
 
     pts, w = panel_quadrature(mesh, spectrum_order)
     integral, diag = wave_resistance_integral(
@@ -383,12 +423,12 @@ def solve_nk(mesh: TriMesh, speed: float, length: float, rho: float = 1000.0,
     # carry only a little, so this is a direct measure of how far the discrete solution is
     # from the continuous one -- and the far-field amplitude near lambda = 1, which is where
     # the resistance integrand is largest, is exactly what a spurious net source corrupts.
-    area = mesh.areas()
     flux = float(abs(np.sum(sigma * area)) / (speed * area.sum()))
     notes = []
-    if flux > 0.01:
+    if not zero_net_flux and flux > 0.01:
         notes.append(f"net source flux is {flux:.1%} of u S; the far-field resistance is "
-                     "not converged at this panel count -- compare the pressure route")
+                     "not converged at this panel count -- compare the pressure route, or "
+                     "pass zero_net_flux=True")
     if order <= 1:
         notes.append("wave influences use the centroid rule over the source panel; on a "
                      "thin Wigley hull at 158 panels raising the order moved the far-field "

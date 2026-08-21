@@ -148,7 +148,8 @@ def _cmd_nk(args: argparse.Namespace) -> int:
         print(f"  spectrum resolved to lambda {cap:.2f} by this mesh")
         result = solve_nk(mesh, speed, length, order=args.order,
                           spectrum_order=args.spectrum_order, rtol=args.rtol,
-                          check_points=args.check_points, lambda_cap=cap)
+                          check_points=args.check_points, lambda_cap=cap,
+                          zero_net_flux=not args.free_net_flux)
         result.pressure_resistance = pressure_resistance(mesh, result.sigma, speed, k0,
                                                          order=args.order)
         print("  " + result.summary().replace("\n", "\n  "))
@@ -213,6 +214,10 @@ def main(argv: list[str] | None = None) -> int:
                       help="tail tolerance for the wave-resistance integral")
     p_nk.add_argument("--check-points", dest="check_points", type=int, default=40,
                       help="off-collocation points for the body-condition residual")
+    p_nk.add_argument("--free-net-flux", dest="free_net_flux", action="store_true",
+                      help="do not constrain the source distribution to emit no net flux; "
+                           "recovers the plain square solve, which on a coarse mesh "
+                           "overstates the far-field resistance by an order of magnitude")
     p_nk.add_argument("--nu", type=int, default=48,
                       help="girth divisions of the fine mesh used for hydrostatics")
     p_nk.add_argument("--nv", type=int, default=240,
