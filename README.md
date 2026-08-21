@@ -46,6 +46,22 @@ catch this back-computed the constant from the oracle and divided by the shipped
 it only ever checked that the two were mutually consistent; it now compares the shipped
 resistance against the oracle, which can fail.
 
+**A spurious net source flux was costing an order of magnitude.** A closed body in a stream
+emits no net source strength, and the two cases that verify well carry almost none —
+1.0 × 10⁻⁴ of u·S on a thin Wigley hull, 1.3 × 10⁻⁴ on a submerged sphere. Sysser 01 carried
+8 × 10⁻². That matters more than its size suggests: a spurious net source is a monopole whose
+far-field amplitude does not fall off with λ the way a closed body's does, while the
+resistance integrand λ²(λ²−1)^(−1/2) is largest exactly where the monopole lives. Solving
+subject to ∫σ dS = 0 — a constrained least-squares problem with nothing to tune — takes the
+Sysser 01 far-field resistance at Fn = 0.30 from 29.07 N to 2.92 N and the pressure value from
+8.40 N to 0.92 N at 480 panels, **and improves the body-condition residual**, from 0.032 to
+0.023 of u, at points the solve never sees. Where the flux is already small it is a null
+operation: the sphere's resistance changes in the sixth significant figure. It is the default;
+`--free-net-flux` recovers the plain solve.
+
+With it, both routes converge on the same mesh sequence — +5.8 % and +2.9 % between 280 and
+480 panels — where unconstrained they swung by a factor of 3.5 and were not even monotone.
+
 **The earlier accuracy claim for the Green function measured the wrong quantity.** It
 measured g_w; the influence matrix uses ∇g_w, whose integrand carries an extra sec²θ. At
 (X, Y, |Z|) = (2, 0.8, 0.02) the production quadrature returned g_w to 1.7e-3 and its
@@ -63,9 +79,19 @@ count of a panel *pair*, which grows as |y_i − y_j| / |z_i + z_j| rather than 
 alone. It is exposed as `greens.oscillation_count`, and `nk.influence_matrix` refuses a mesh
 outside the envelope rather than returning a plausible number from a coarsened grid.
 
-Two independent routes to the resistance are implemented, and they agree. On a thin Wigley
-hull at Fn = 0.30 with 278 panels, the far-field amplitude gives 0.942 of the Michell value
-and the pressure integral 0.958, the two within 1.7 per cent of each other.
+Two independent routes to the resistance are implemented, and they agree on cases with an
+analytic answer: on a thin Wigley hull at Fn = 0.30 with 278 panels the far-field amplitude
+gives 0.936 of the Michell value and the pressure integral 0.940, within 0.4 per cent of each
+other. They are not interchangeable on a coarse mesh, though. The far-field integral is
+positive-definite in σ, so discretisation error can only inflate it and never cancel — five per
+cent of noise on the density doubles it, while the pressure route moves by two. **Quote the
+pressure route**, with the far-field value beside it as an upper bound.
+
+On Sysser 01 at Fn = 0.30, static attitude, 480 panels, the pressure route gives 0.921 N
+against a measured residuary resistance of 1.134 N, a ratio of 0.81 — and residuary resistance
+is a proxy that also contains nonlinear and viscous-form contributions, so the wave resistance
+it brackets is below 1.134 N. The far-field route gives 2.92 N, still carrying its one-sided
+bias.
 
 Throughput is 1164 microseconds per panel pair on a real Sysser 01 mesh, against 928 before
 the kernel correction, so the fix cost 25 per cent. Against the 10-minute assembly budget
