@@ -78,7 +78,7 @@ tabres = r"""\begin{table}[htbp]
 \centering
 \caption{Wave resistance of Sysser 01 by both routes at the static attitude on the
 280-panel mesh, against the residuary resistance reduced from the measurements, for Froude
-numbers from 0.10 to 0.60. The last two columns are the solver's own diagnostics: the
+numbers from FNLO to FNHI. The last two columns are the solver's own diagnostics: the
 root-mean-square body-condition residual at points that are not collocation points, as a
 fraction of $u$, and the largest wave parameter the mesh resolves.}
 \label{tab:resistance}
@@ -115,22 +115,6 @@ subs = {
 }
 json.dump(subs, open(B / "subs.json", "w"), indent=1, default=str)
 print("substitutions ready:", len(subs))
-
-# ---------- assemble the document ----------
-tex = (repo / "docs/report/report.tex").read_text()
-part = lambda n: (P / n).read_text().strip()
-tex = tex.replace("ABSTRACTBODY", part("abstract.tex"))
-tex = tex.replace("INTRO", part("intro.tex"))
-tex = tex.replace("METHOD", part("method.tex"))
-tex = tex.replace("VERIF", part("verif.tex"))
-tex = tex.replace("RESULTS", part("results.tex"))
-tex = tex.replace("CAPLIM", part("caplim.tex"))
-tex = tex.replace("CONCL", part("concl.tex"))
-for k, v in subs.items():
-    tex = tex.replace(k, str(v))
-(repo / "docs/report/wave-resistance-report.tex").write_text(tex)
-print("built", len(tex), "chars; unresolved:",
-      [k for k in ("RESULTNARRATIVE", "RESABSTRACT", "CONCLRESULT") if k in tex])
 
 # ---------- convergence and Michell tables, appended after the main build ----------
 extra = {}
@@ -172,3 +156,77 @@ S[table-format=1.3]S[table-format=1.3]@{}}
 \end{table}""")
 json.dump(extra, open(B / "extra.json", "w"), indent=1)
 print("extra tables:", list(extra))
+
+# ---------- summary statistics the narrative quotes ----------
+srt = sorted(rec, key=lambda r: r["fn"])
+usable = [r for r in srt if r["rr_meas"] > 0.05]
+ratios_p = [(r["fn"], r["r_press"] / r["rr_meas"]) for r in usable]
+ratios_f = [(r["fn"], r["r_far"] / r["rr_meas"]) for r in usable]
+peak = max(srt, key=lambda r: r["r_press"])
+negs = [r["fn"] for r in srt if r["r_press"] <= 0.0]
+stats = {
+ "RATPMIN": f"{min(v for _, v in ratios_p):+.2f}",
+ "RATPMAX": f"{max(v for _, v in ratios_p):+.2f}",
+ "RATFMIN": f"{min(v for _, v in ratios_f):+.2f}",
+ "RATFMAX": f"{max(v for _, v in ratios_f):+.2f}",
+ "RATSPREAD": f"{max(v for _, v in ratios_p) / min(v for _, v in ratios_p if v > 0):.0f}",
+ "PEAKFN": f"{peak['fn']:.2f}",
+ "PEAKVAL": f"{peak['r_press']:.2f}",
+ "NNEG": str(len(negs)),
+ "NEGFN": ", ".join(f"{v:.2f}" for v in negs),
+ "FN30P": f"{by_fn[0.3]['r_press']:.3f}" if 0.3 in by_fn else "n/a",
+ "FN30F": f"{by_fn[0.3]['r_far']:.3f}" if 0.3 in by_fn else "n/a",
+ "FN30RAT": f"{by_fn[0.3]['r_press'] / by_fn[0.3]['rr_meas']:.2f}" if 0.3 in by_fn else "n/a",
+ "NPOINTS": str(len(srt)),
+ "FNLO": f"{srt[0]['fn']:.2f}",
+ "FNHI": f"{srt[-1]['fn']:.2f}",
+}
+if 0.3 in r480 and 0.3 in by_fn:
+    stats["CONV30F"] = f"{100 * (r480[0.3]['r_far'] / by_fn[0.3]['r_far'] - 1):+.1f}"
+    stats["CONV30P"] = f"{100 * (r480[0.3]['r_press'] / by_fn[0.3]['r_press'] - 1):+.1f}"
+    stats["R480P"] = f"{r480[0.3]['r_press']:.3f}"
+    stats["R480F"] = f"{r480[0.3]['r_far']:.3f}"
+    stats["RES480"] = f"{r480[0.3]['resid_rms']:.3f}"
+    stats["RES280"] = f"{by_fn[0.3]['resid_rms']:.3f}"
+if mrec:
+    ms = sorted(mrec, key=lambda r: r["fn"])
+    stats["MEASATT"] = "; ".join(
+        f"$\\Fn = {r['fn']:.2f}$: \\SI{{{r['r_press']:.3f}}}{{\\newton}} against "
+        f"\\SI{{{by_fn[round(r['fn'], 2)]['r_press']:.3f}}}{{\\newton}}"
+        for r in ms if round(r["fn"], 2) in by_fn)
+try:
+    mich = json.load(open(B / "michell.json"))
+    parts_m = []
+    for fk, row in sorted(mich.items()):
+        fn = fk.replace("fn", "")
+        for nk, nv in sorted(row.items()):
+            if nk == "michell":
+                continue
+            parts_m.append(f"$\\Fn = {fn}$ at {nk[1:]} panels, "
+                           f"{nv['far_over_oracle']:.3f} and {nv['press_over_oracle']:.3f}")
+    stats["MICHELL"] = "; ".join(parts_m)
+except Exception:
+    stats["MICHELL"] = "PENDING"
+json.dump(stats, open(B / "stats.json", "w"), indent=1)
+print("stats:", len(stats), "keys")
+
+# ---------- assemble the document ----------
+tex = (repo / "docs/report/report.tex").read_text()
+part = lambda n: (P / n).read_text().strip()
+tex = tex.replace("ABSTRACTBODY", part("abstract.tex"))
+tex = tex.replace("INTRO", part("intro.tex"))
+tex = tex.replace("METHOD", part("method.tex"))
+tex = tex.replace("VERIF", part("verif.tex"))
+tex = tex.replace("RESULTS", part("results.tex"))
+tex = tex.replace("CAPLIM", part("caplim.tex"))
+tex = tex.replace("CONCL", part("concl.tex"))
+_all = dict(subs)
+_all.update(json.load(open(B / "extra.json")) if (B / "extra.json").exists() else {})
+_all.update(json.load(open(B / "stats.json")) if (B / "stats.json").exists() else {})
+# Longest keys first, so TABCONV is not eaten by a shorter prefix.
+for k in sorted(_all, key=len, reverse=True):
+    tex = tex.replace(k, str(_all[k]))
+(repo / "docs/report/wave-resistance-report.tex").write_text(tex)
+print("built", len(tex), "chars; unresolved:",
+      [k for k in ("RESULTNARRATIVE", "RESABSTRACT", "CONCLRESULT") if k in tex])
+

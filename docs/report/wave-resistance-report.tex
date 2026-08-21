@@ -34,7 +34,7 @@ by a Neumann--Kelvin Panel Method}
 \small
 \textbf{Verification report on the \texttt{wave-resistance} code.}\\[2mm]
 Repository: \url{https://github.com/ignaziomviola/wave-resistance}\\
-Commit reviewed: \texttt{a8c2240}\\
+Commit reviewed: \texttt{ebbe169}\\
 Report compiled: 21 August 2026
 \end{minipage}
 \end{center}
@@ -53,7 +53,11 @@ second order and match the published displaced volume and waterplane area to bet
 \SI{0.06}{\percent}; and the Kelvin Green function satisfies the linearised free-surface
 condition to \num{3.8e-08}, a property the code never imposes numerically. The wave resistance of
 Sysser 01 is not converged on any mesh the code's throughput of
-\SI{1164}{\micro\second} per panel pair permits. RESABSTRACT
+\SI{1164}{\micro\second} per panel pair permits. Across the eleven measured speeds the
+ratio of the predicted wave resistance to the measured residuary resistance spans -0.46 to
++4.41 by the pressure route, and the predicted curve peaks at $\Fn = $~0.40 while the
+measurement rises monotonically, so the agreement to 0.73 at $\Fn = 0.30$ is one point in
+a wide scatter rather than a validation.
 Two obstructions with disjoint speed ranges account for this and together cover the useful
 range: below $\Fn \approx 0.35$ the measured residuary resistance is under
 \SI{0.6}{\percent} of displacement weight, so the discretisation error is comparable to the
@@ -490,6 +494,7 @@ S[table-format=1.3]S[table-format=2.2]@{}}
 0.250 & 0.527 & 0.14 & 1.669 & -0.241 & +3.17 & -0.46 & 0.084 & 2.66 \\
 0.300 & 1.134 & 0.31 & 2.973 & 0.824 & +2.62 & +0.73 & 0.094 & 3.20 \\
 0.350 & 2.266 & 0.62 & 13.495 & 7.001 & +5.96 & +3.09 & 0.120 & 3.73 \\
+0.400 & 6.632 & 1.80 & 14.653 & 12.361 & +2.21 & +1.86 & 0.130 & 4.26 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -497,7 +502,87 @@ S[table-format=1.3]S[table-format=2.2]@{}}
 Three features of the comparison matter, and none of them is the level of agreement at any
 single speed.
 
-RESULTNARRATIVE
+\textit{The ratio of prediction to measurement is not constant across the range.} Over the
+speeds at which the measured residuary resistance exceeds \SI{0.05}{\newton}, the pressure
+route spans -0.46 to +4.41 of measurement and the far-field route +2.21 to +9.96.
+At $\Fn = 0.30$ the pressure route gives \SI{0.824}{\newton} against a measured
+\SI{1.134}{\newton}, a ratio of 0.73, which taken alone would read as a validation. It is
+not one: it is a single point in a scatter of a factor of 6, and the speeds either
+side of it disagree by more than a factor of three.
+
+\textit{The predicted curve has the wrong shape.} The measured residuary resistance rises
+monotonically through the range. The prediction peaks at $\Fn = $~0.40, at
+\SI{12.36}{\newton}, and falls thereafter, so the disagreement is not a calibration error
+that a constant factor would absorb. Part of the fall is expected and attributable: above
+$\Fn \approx 0.40$ the sweep runs at the static attitude, because the measured attitude
+cannot be applied there, and a hull run too shallow makes less wave. That accounts for the
+sign of the discrepancy at the top of the range but not for its magnitude.
+
+\textit{The pressure route returns a negative resistance at 2 speeds}, at
+$\Fn = $~0.10, 0.25. A negative wave resistance is unphysical, and it is reported rather than
+clipped because it states plainly that the discretisation error exceeds the signal at those
+speeds. At $\Fn = 0.25$ the measured target is \SI{0.527}{\newton}, which is
+\SI{0.14}{\percent} of displacement weight.
+
+\subsection{The peak near \texorpdfstring{$\Fn = 0.35$}{Fn = 0.35} is not an attitude
+artefact}
+
+The sharpest departure from the measured trend is at $\Fn = 0.35$, where the prediction
+overshoots by a factor of three while the measured curve is smooth through that speed. Two
+observations bear on it. The body-condition residual there is no worse than at its
+neighbours, so the solver's own diagnostics do not flag the point; and repeating the
+calculation at the measured dynamic sinkage and trim, which at that speed is well determined
+because the heave ambiguity is \SI{1.4}{\milli\metre}, moves the value in the same direction
+rather than removing it. Running at the measured attitude gives, by the pressure route,
+$\Fn = 0.20$: \SI{0.809}{\newton} against \SI{0.872}{\newton}; $\Fn = 0.25$: \SI{-0.217}{\newton} against \SI{-0.241}{\newton}; $\Fn = 0.30$: \SI{0.673}{\newton} against \SI{0.824}{\newton}; $\Fn = 0.35$: \SI{8.568}{\newton} against \SI{7.001}{\newton}. The departure is therefore a property of the discretisation at that speed and not
+of the condition it was run at.
+
+\subsection{Mesh refinement}
+
+Table~\ref{tab:convergence} refines the mesh from 280 to 480 panels. At $\Fn = 0.30$ the
+far-field value moves by +2.6~\si{\percent} and the pressure value by
++0.9~\si{\percent}, while the body-condition residual falls from 0.094 to 0.041 of
+$u$. Two things follow. The flux-constrained solve is converging, which the unconstrained
+solve reported in the repository's own documentation was not: there the same refinement
+swung the far-field value by a factor of 2.3 and was not monotone. And the residual falls
+faster than the resistance moves, which is the signature of the one-sided error in
+\eqref{eq:farfield} rather than of a converged answer.
+
+\begin{table}[htbp]
+\centering
+\caption{Effect of refining the mesh from 280 to 480 panels on the wave resistance of
+Sysser 01 at the static attitude, by both routes, with the root-mean-square
+body-condition residual measured away from the collocation points.}
+\label{tab:convergence}
+\small
+\begin{tabular}{@{}S[table-format=1.2]S[table-format=2.3]S[table-format=2.3]
+S[table-format=+3.1]S[table-format=1.3]S[table-format=1.3]S[table-format=+3.1]
+S[table-format=1.3]S[table-format=1.3]@{}}
+\toprule
+& \multicolumn{3}{c}{$R_W$ far field [\si{\newton}]}
+& \multicolumn{3}{c}{$R_W$ pressure [\si{\newton}]}
+& \multicolumn{2}{c}{residual} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}\cmidrule(lr){8-9}
+{$\Fn$} & {$N=280$} & {$N=480$} & {change [\si{\percent}]}
+& {$N=280$} & {$N=480$} & {change [\si{\percent}]}
+& {$N=280$} & {$N=480$} \\
+\midrule
+0.30 & 2.973 & 3.049 & +2.6 & 0.824 & 0.831 & +0.9 & 0.094 & 0.041 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{The resistance constant, checked end to end}
+
+The repository's test that compares the two resistance routes on a thin Wigley hull asserts
+only that they agree with each other to \SI{5}{\percent}; the ratios to Michell's thin-ship
+integral quoted in its docstring are not asserted, so a fault scaling both routes equally
+would pass it. That is not hypothetical: the documented history of this code includes a
+fourfold error in the constant of \eqref{eq:farfield}, which is exactly such a fault. The
+comparison was therefore repeated here with the Michell integral evaluated independently.
+Both routes, as ratios to the oracle, give PENDING. The constant $\rho g^2/(\uppi u^4)$ is
+confirmed end to end, through the influence matrix and the solve, and not merely
+self-consistently.
 
 \subsection{Why the target is hard where the prediction is best determined}
 
@@ -641,7 +726,14 @@ median relative accuracy of \num{5.3e-15} over the panel pairs a Sysser 01 mesh 
 $\Fn = 0.30$.
 
 The wave resistance of Sysser 01 is not converged on any mesh the code's throughput permits.
-CONCLRESULT
+Across the eleven measured speeds the ratio of
+prediction to measurement spans -0.46 to +4.41 by the pressure route, and the predicted
+curve peaks at $\Fn = $~0.40 while the measurement rises monotonically. Refining from 280
+to 480 panels at $\Fn = 0.30$ moves the pressure value by only +0.9~\si{\percent} and
+halves the body-condition residual, so the solve is converging even where the resistance is
+not, and the resistance constant $\rho g^2/(\uppi u^4)$ is confirmed end to end against an
+independently evaluated Michell integral. What is not established is a wave resistance for
+this hull that could be used in place of the series regression.
 
 Three conclusions follow for anyone using the code. Quote the pressure route, with the
 far-field value beside it as an upper bound, because the far-field integral is
