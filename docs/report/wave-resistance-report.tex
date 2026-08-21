@@ -20,7 +20,7 @@
 \renewcommand{\arraystretch}{1.12}
 \newcommand{\Fn}{\mathit{Fn}}
 
-\title{\vspace{-12mm}\bfseries Wave Resistance of a Systematic Yacht Hull\\
+\title{\vspace{-12mm}\bfseries Wave Resistance of Two Systematic Yacht Hulls\\
 by a Neumann--Kelvin Panel Method}
 \author{}
 \date{}
@@ -34,7 +34,7 @@ by a Neumann--Kelvin Panel Method}
 \small
 \textbf{Verification report on the \texttt{wave-resistance} code.}\\[2mm]
 Repository: \url{https://github.com/ignaziomviola/wave-resistance}\\
-Commit reviewed: \texttt{bf52124}\\
+Commit reviewed: \texttt{19aa675}\\
 Report compiled: 21 August 2026
 \end{minipage}
 \end{center}
@@ -44,10 +44,11 @@ Report compiled: 21 August 2026
 \noindent
 The \texttt{wave-resistance} code solves the Neumann--Kelvin problem for a bare
 sailing-yacht canoe body by a constant-source panel method, with the Delft Systematic Yacht
-Hull Series (DSYHS) hull Sysser 01 as the worked case. This report verifies the code
-independently of its own assertions and reports the wave resistance across the measured
-speed range. The implementation is correct at the level its analytic oracles can resolve:
-its suite of 160 tests passes; the displaced volume computed by four independent
+Hull Series (DSYHS) hulls Sysser 01 and Sysser 50 as the worked cases. This report verifies
+the code independently of its own assertions, reports the wave resistance of both hulls
+across the measured speed range, and identifies the causes of the disagreement with the
+series data. The implementation is correct at the level its analytic oracles can resolve:
+its suite of 183 tests passes; the displaced volume computed by four independent
 applications of the divergence theorem agrees to \num{3.0e-15}; the hydrostatics converge at
 second order and match the published displaced volume and waterplane area to better than
 \SI{0.06}{\percent}; and the Kelvin Green function satisfies the linearised free-surface
@@ -58,12 +59,19 @@ ratio of the predicted wave resistance to the measured residuary resistance span
 \num{+4.41} by the pressure route, and the predicted curve peaks at $\Fn = $~0.60 while the
 measurement rises monotonically, so the agreement to \num{0.73} at $\Fn = 0.30$ is one point in a
 wide scatter rather than a validation.
-Two obstructions with disjoint speed ranges account for this and together cover the useful
-range: below $\Fn \approx 0.35$ the measured residuary resistance is under
-\SI{0.6}{\percent} of displacement weight, so the discretisation error is comparable to the
-signal, while above $\Fn \approx 0.40$ the published data does not determine the running
-attitude, the heave ambiguity from the unstated sinkage datum reaching
-\SI{44}{\milli\metre} against a \SI{31}{\milli\metre} measured sinkage at $\Fn = 0.50$.
+Running a second hull, Sysser 50, separates the causes.
+Its supplied surface reproduces its published waterline length to \SI{-0.04}{\percent} and
+beam to \SI{-0.002}{\percent}, against \SI{+0.51}{\percent} and \SI{+1.14}{\percent} for
+Sysser 01, although both files carry the same 2012 re-measurement header, so the geometry
+discrepancy is specific to one hull rather than systematic. The measurement release does
+state the sinkage datum --- the vertical displacement of the centre of gravity, which fixes
+the trim pivot at the longitudinal centre of buoyancy, confirmed to \SI{0.16}{\milli\metre}
+by the transducer offsets of the nine series-1 hulls --- so the heave ambiguity previously
+reported as the obstruction above $\Fn = 0.40$ does not exist. Applying that attitude raises
+the prediction by \SIrange{59}{103}{\percent} over $\Fn = 0.40$ to $0.50$, tracking a
+\SIrange{24}{57}{\percent} rise in the volume below the undisturbed plane, so the static and
+running attitudes bracket the answer and a linearised free surface cannot narrow the
+interval.
 Two findings are added here: the stated worst-case accuracy of the wave-kernel gradient,
 \num{7.0e-4}, holds at $\Fn = 0.30$ but is exceeded by a factor of four at $\Fn = 0.45$;
 and the spectral cut-off can fall below the physical lower limit of the resistance integral
@@ -97,6 +105,7 @@ $\nabla_c$ & displaced volume of the canoe body    & $\Gamma$ & waterline, $S\ca
 \begin{tabular}{@{}ll@{}}
 DSYHS & Delft Systematic Yacht Hull Series\\
 IGES  & Initial Graphics Exchange Specification\\
+LCB   & longitudinal centre of buoyancy\\
 ITTC  & International Towing Tank Conference\\
 NURBS & Non-Uniform Rational B-Spline\\
 $\Fn$ & Froude number, $u/\sqrt{gc}$\\
@@ -349,6 +358,100 @@ $\|\mathsf{A}\sigma - \bm{b}\|$ subject to $\bm{a}^{\mathsf{T}}\sigma = 0$ with 
 the panel areas, by the null-space method. There is nothing to tune, and the constraint is
 the default.
 
+\subsection{The two hulls}
+
+Two hulls of the series are run here. Sysser 01 is the parent of series 1. Sysser 50
+belongs to series 4 and is the extreme of the whole series in beam for its draught, which
+is why it was chosen: the method's cost and its error both grow with beam, so it is the
+hardest case available. Table~\ref{tab:hulls} gives the published particulars and
+figure~\ref{fig:geometry50} the two forms.
+
+\begin{table}[htbp]
+\centering
+\caption{Published model-scale particulars of the two hulls, from the DSYHS hydrostatics
+release. Sysser 01 is the parent of series 1 and Sysser 50 belongs to series 4.}
+\label{tab:hulls}
+\small
+\begin{tabular}{@{}llS[table-format=1.6]S[table-format=1.6]@{}}
+\toprule
+& unit & {Sysser 01} & {Sysser 50} \\
+\midrule
+waterline length & \si{\metre} & 1.6000 & 2.0000 \\
+waterline beam & \si{\metre} & 0.5072 & 0.6000 \\
+canoe-body draught & \si{\metre} & 0.1270 & 0.0946 \\
+displaced volume & \si{\metre\cubed} & 0.037614 & 0.047536 \\
+wetted area & \si{\metre\squared} & 0.6425 & 0.9170 \\
+prismatic coefficient & --- & 0.5644 & 0.5387 \\
+midship coefficient & --- & 0.6464 & 0.7773 \\
+beam / draught & --- & 3.99 & 6.34 \\
+LCB aft of midships & \si{\percent} & -2.29 & -7.90 \\
+displacement weight & \si{\newton} & 368.9 & 466.2 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{../figures/geometry50.pdf}
+\caption{Wetted form of the two hulls at their reference conditions, on a common scale:
+body plan of (a) Sysser 01 and (b) Sysser 50, and plan view of (c) Sysser 01 and
+(d) Sysser 50, with the published longitudinal centre of buoyancy marked. The dashed line
+is the undisturbed free surface.}
+\label{fig:geometry50}
+\end{figure}
+
+The forms differ in the two respects that matter to a Neumann--Kelvin solve. Sysser 50
+carries a beam-to-draught ratio of \num{6.34} against \num{3.99}, so its panel pairs straddle the
+hull at a larger transverse separation for a given depth, and the oscillation count of a
+pair grows as $|y_i - y_j|/|z_i + z_j|$: on the meshes used here the worst count at
+$\Fn = 0.30$ is \num{366} for Sysser 50 against \num{303} for Sysser 01. And its centre of buoyancy
+sits \num{7.9} per cent of the waterline length aft of midships against \num{2.3} per cent, with a
+wide, shallow after body, so its waterplane is far from fore-and-aft symmetric.
+
+\subsection{Two conventions in the geometry release, and one correction to this code}
+
+Adding the second hull exposed an inconsistency in the release and a matching assumption in
+the code. The Sysser 01 file parameterises its surface with the girth direction first and
+the length second; the Sysser 50 file does the opposite. Hydrostatics did not notice,
+because the tessellation is uniform in both parameters, but the body-fitted mesh does: it
+walks stations along the second parameter and rows along the first, and on Sysser 50 it
+found no station crossing the waterline and raised rather than returning a wrong answer.
+The fix is to detect the convention from the control net --- the longitudinal parameter is
+the one along which $x$ varies more, by a factor of 20 on Sysser 01 and six the other way on
+Sysser 50 --- and transpose the patch once on loading. Sysser 01's results are unchanged to
+every digit reported.
+
+\subsection{The trim pivot, which the release does determine}
+
+The attitude at speed is a rotation and a heave, and applying it needs the point about which
+the hull rotates. The release's own Info sheet supplies it: the channel $z$ is defined as the
+``Vertical displacement of center of gravity with respect to zero speed'' and $\theta$ as the
+``Pitch angle of hull with respect to zero speed''. The reference point is therefore the
+centre of gravity, and the rigid motion is a rotation about that point followed by a heave of
+it.
+
+Where the centre of gravity lies is not stated, but it is determined. A model ballasted to
+float upright at zero trim carries it over the longitudinal centre of buoyancy, so its
+longitudinal position is the published $\mathrm{LCB}$. The data confirms this rather than
+merely permitting it: on the nine series-1 hulls the workbook's fore and aft transducer
+offsets are asymmetric, and their midpoint reproduces $-\mathrm{LCB}$ to five decimal places
+on seven of the nine and to \SI{0.16}{\milli\metre} on the other two, which places the centre
+of gravity at the $\mathrm{LCB}$ given transducers mounted symmetrically about the waterline
+midpoint. From hull 10 onwards, Sysser 50 included, the offsets are entered as round nominal
+values and carry no information either way.
+
+Only the pivot's longitudinal position matters. Displacing the pivot vertically by $\delta z$
+changes the motion by a surge of $\delta z \sin\theta$, which no wave resistance depends on,
+and a heave of $\delta z(1-\cos\theta)$, which is \SI{0.19}{\milli\metre} for
+$\delta z = \SI{0.1}{\metre}$ at the largest trim in either hull's table.
+
+This supersedes a claim carried in the repository's documentation and repeated in the first
+version of this report: that the reference point for the measured sinkage is unstated, and
+that the running attitude is therefore undetermined above $\Fn \approx 0.40$ with a heave
+ambiguity reaching \SI{44}{\milli\metre}. The reference point is stated, the pivot follows
+from it, and that ambiguity does not exist. What does obstruct the upper range is a different
+thing, and section~\ref{sec:discrepancy} identifies it.
+
 \section{Verification}
 Verification here means two separate things, and they are reported separately: that the
 code's own test suite passes, and that its central claims survive checks constructed
@@ -356,10 +459,14 @@ independently of it.
 
 \subsection{The test suite}
 
-The suite comprises 160 tests and all of them pass, in \SI{718}{\second} on four cores.
-The suite is not a smoke test: it contains the analytic oracles the formulation is anchored
-on, among them Michell's thin-ship integral, the sphere in an unbounded stream, closed-form
-Wigley hydrostatics and a rectangular box.
+The suite comprises 183 tests and all of them pass, in \SI{816}{\second} on four cores.
+It is not a smoke test: it contains the analytic oracles the formulation is anchored on,
+among them Michell's thin-ship integral, the sphere in an unbounded stream, closed-form
+Wigley hydrostatics and a rectangular box. Twelve of the tests are new here and cover the
+second hull, the surface-parameterisation convention and the trim pivot; one of them failed
+when first written, asserting that a vertical offset of the pivot leaves the displaced volume
+unchanged to \SI{0.2}{\percent} when the true figure is \SI{0.22}{\percent}, and it now
+asserts the effect at the size it has.
 
 \subsection{Geometry and hydrostatics}
 
@@ -521,9 +628,8 @@ monotonically through the range. The prediction does not: it reaches a local max
 \SI{8.40}{\newton} at $\Fn = 0.50$, and rises again to \SI{28.30}{\newton} at
 $\Fn = 0.60$. The disagreement is therefore not a calibration error that a constant factor
 would absorb. Part of the deficit at the top of the range is expected and attributable:
-above $\Fn \approx 0.40$ the sweep runs at the static attitude, because the measured
-attitude cannot be applied there, and a hull run \SI{31}{\milli\metre} too shallow makes
-less wave. That accounts for the sign of the discrepancy above $\Fn = 0.40$ but not for the
+above $\Fn \approx 0.40$ the sweep runs at the static attitude, and a hull run
+\SI{31}{\milli\metre} too shallow makes less wave. That accounts for the sign of the discrepancy above $\Fn = 0.40$ but not for the
 non-monotonicity below it.
 
 \textit{The two routes converge on each other as $\Fn$ rises.} They differ by a factor of
@@ -543,8 +649,7 @@ The sharpest departure from the measured trend is at $\Fn = 0.35$, where the pre
 overshoots by a factor of three while the measured curve is smooth through that speed. Two
 observations bear on it. The body-condition residual there is no worse than at its
 neighbours, so the solver's own diagnostics do not flag the point; and repeating the
-calculation at the measured dynamic sinkage and trim, which at that speed is well determined
-because the heave ambiguity is \SI{1.4}{\milli\metre}, moves the value in the same direction
+calculation at the measured dynamic sinkage and trim moves the value in the same direction
 rather than removing it. Running at the measured attitude gives, by the pressure route,
 $\Fn = 0.20$: \SI{0.809}{\newton} against \SI{0.872}{\newton}; $\Fn = 0.25$: \SI{-0.217}{\newton} against \SI{-0.241}{\newton}; $\Fn = 0.30$: \SI{0.673}{\newton} against \SI{0.824}{\newton}; $\Fn = 0.35$: \SI{8.568}{\newton} against \SI{7.001}{\newton}. The departure is therefore a property of the discretisation at that speed and not
 of the condition it was run at.
@@ -605,10 +710,8 @@ the range: it is \SI{0.31}{\percent} at $\Fn = 0.30$ and does not reach
 a few per cent of displacement weight is therefore comparable to the signal at the low end
 of the range, which is exactly where the running attitude is well determined. Above
 $\Fn \approx 0.40$ the target is large --- \SI{4.2}{\percent} of weight at $\Fn = 0.45$ ---
-but the attitude is not: the heave ambiguity from the unstated sinkage datum reaches
-\SI{44}{\milli\metre} at $\Fn = 0.50$ against a measured sinkage of
-\SI{31}{\milli\metre}. The two windows do not overlap, and between them they cover the
-useful speed range.
+and the attitude is known, but applying it inside a linearised free-surface model does not
+help, for the reason section~\ref{sec:discrepancy} quantifies.
 
 Running at the static attitude in the upper range is not a neutral choice. The model sinks
 \SI{31}{\milli\metre} and trims \ang{3.2} bow-up by $\Fn = 0.50$, against a canoe-body
@@ -649,14 +752,291 @@ The net source flux is below \num{1e-17} of $uS$ at every speed, confirming that
 constrained solve enforces its constraint exactly rather than approximately. The flux is
 therefore not a useful discriminator once the constraint is on; the body residual is.
 
+
+\subsection{Sysser 50}
+
+Figure~\ref{fig:sysser50} and table~\ref{tab:s50} give the same calculation for Sysser 50 at
+its 13 measured speeds. Resistance is shown as a fraction of displacement weight, because the
+two hulls differ in displacement by \SI{26}{\percent} and a comparison in newtons would
+confuse the hulls with the speeds.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{../figures/sysser50.pdf}
+\caption{The two hulls compared: (a) measured residuary resistance and predicted wave
+resistance by the pressure route, both as a percentage of displacement weight, at the static
+attitude; (b) ratio of predicted wave resistance to measured residuary resistance at the
+static and at the measured running attitude, over the speeds where the sinkage is a large
+fraction of the draught. The dark line in (b) marks unity.}
+\label{fig:sysser50}
+\end{figure}
+
+\begin{table}[htbp]
+\centering
+\caption{Wave resistance of Sysser 50 by both routes at the static attitude on a
+320-panel mesh, against the residuary resistance
+reduced from the measurements, at the 13 measured speeds. Columns as in
+table~\ref{tab:resistance}.}
+\label{tab:s50}
+\small
+\begin{tabular}{@{}S[table-format=1.3]S[table-format=+2.3]S[table-format=2.2]
+S[table-format=+3.3]S[table-format=+3.3]S[table-format=+3.2]S[table-format=+3.2]
+S[table-format=1.3]S[table-format=2.2]@{}}
+\toprule
+{$\Fn$} & {$R_r$ [\si{\newton}]} & {$R_r/W$ [\si{\percent}]} &
+{$R_W$ far [\si{\newton}]} & {$R_W$ pres. [\si{\newton}]} &
+{far$/R_r$} & {pres.$/R_r$} & {residual} & {$\lambda_\mathrm{max}$} \\
+\midrule
+0.100 & 0.030 & 0.01 & 0.354 & 0.075 & {--} & {--} & 0.263 & 0.50 \\
+0.150 & 0.120 & 0.03 & 0.549 & 0.193 & +4.59 & +1.61 & 0.297 & 1.14 \\
+0.200 & 0.304 & 0.07 & 3.266 & 0.310 & +10.74 & +1.02 & 0.166 & 2.03 \\
+0.250 & 0.727 & 0.16 & 1.628 & 0.979 & +2.24 & +1.35 & 0.088 & 2.81 \\
+0.300 & 1.591 & 0.34 & 6.085 & 3.391 & +3.82 & +2.13 & 0.095 & 3.37 \\
+0.350 & 3.359 & 0.72 & 4.552 & 4.716 & +1.36 & +1.40 & 0.075 & 3.93 \\
+0.400 & 7.856 & 1.69 & 12.039 & 11.068 & +1.53 & +1.41 & 0.080 & 4.49 \\
+0.449 & 17.408 & 3.74 & 19.581 & 19.000 & +1.12 & +1.09 & 0.082 & 5.04 \\
+0.501 & 29.477 & 6.33 & 18.130 & 19.021 & +0.62 & +0.65 & 0.090 & 5.63 \\
+0.551 & 37.972 & 8.16 & 17.001 & 17.296 & +0.45 & +0.46 & 0.092 & 6.18 \\
+0.600 & 46.017 & 9.89 & 20.883 & 20.120 & +0.45 & +0.44 & 0.092 & 6.74 \\
+0.650 & 50.559 & 10.86 & 28.975 & 27.129 & +0.57 & +0.54 & 0.097 & 7.30 \\
+0.700 & 53.305 & 11.46 & 36.787 & 35.698 & +0.69 & +0.67 & 0.103 & 7.85 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Three features distinguish Sysser 50's comparison from Sysser 01's. The ratio of prediction
+to measurement spans \numrange{0.44}{2.13} by the pressure route, against \numrange{-0.46}{4.41} for Sysser 01, and the
+prediction is positive at all 13 speeds where Sysser 01 returns a negative value at two. The
+predicted curve rises monotonically through $\Fn = 0.45$, dips over
+$\Fn = \numrange{0.50}{0.55}$ and rises again, so it has the same non-monotone character as
+Sysser 01's but a shallower one. And the two resistance routes come together above
+$\Fn = 0.45$, differing by \SI{7}{\percent} or better, where on Sysser 01 they differ by up to a factor of
+\num{3.6} at comparable speeds.
+
+The last of these is the useful one, because it separates arithmetic from physics. Where the
+two routes agree the discretisation error is small, and above $\Fn = 0.45$ they agree while
+the prediction is only \numrange{0.44}{1.09} of measurement. Section~\ref{sec:discrepancy} takes that
+apart.
+
+\section{Sysser 50, and Where the Discrepancies Come From}
+\label{sec:discrepancy}
+Running the second hull separates causes that a single hull confounds. Four are identified
+below, in the order in which they bite, and each is supported by a measurement that
+distinguishes it from the others.
+
+\subsection{The geometry discrepancy is specific to Sysser 01, not a property of the release}
+
+The repository attributes the disagreement between the supplied Sysser 01 surface and the
+published Sysser 01 hydrostatics --- \SI{0.51}{\percent} in waterline length,
+\SI{1.14}{\percent} in waterline beam, \SI{2.11}{\percent} in wetted area --- to the file's
+provenance: its header records a 2012 re-measurement of the physical model, while the table
+describes the hull the series was built and towed as. Sysser 50 tests that attribution,
+because its file carries the identical header and the identical patch name.
+
+It does not survive as stated. On Sysser 50 the same comparison gives
+\SI{-0.04}{\percent} in waterline length and \SI{-0.002}{\percent} in beam ---
+respectively 12 and 500 times smaller than on Sysser 01 --- against
+\SI{0.67}{\percent} in wetted area. Whatever produced Sysser 01's gap did not act on
+Sysser 50, so it is not a systematic consequence of the 2012 campaign.
+
+\begin{table}[htbp]
+\centering
+\caption{Recomputed hydrostatics against the published values for both hulls, at the
+reference condition set by matching the published displaced volume, on a $96\times480$ mesh
+per patch. The displaced volume is matched by construction. The last row is a difference in
+millimetres rather than a percentage.}
+\label{tab:geom}
+\small
+\begin{tabular}{@{}lS[table-format=1.6]cS[table-format=1.6]c@{}}
+\toprule
+& \multicolumn{2}{c}{Sysser 01} & \multicolumn{2}{c}{Sysser 50} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+& {published} & difference & {published} & difference \\
+\midrule
+$c$ & 1.600000 & \num{+0.510} & 2.000000 & \num{-0.041} \\
+$b$ & 0.507200 & \num{+1.144} & 0.600000 & \num{-0.002} \\
+$d$ & 0.127040 & \num{+0.058} & 0.094600 & \num{-0.226} \\
+$S_c$ & 0.642534 & \num{+2.113} & 0.916960 & \num{+0.670} \\
+$A_w$ & 0.558566 & \num{-0.032} & 0.825520 & \num{+1.218} \\
+$A_m$ & 0.041651 & \num{-0.107} & 0.044120 & \num{-1.118} \\
+$\nabla_c$ & 0.037614 & \num{+0.026} & 0.047536 & \num{+0.042} \\
+$\mathrm{LCB}$ & -0.036640 & \num{+2.31}\,mm & -0.158000 & \num{-1.78}\,mm \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Two further measurements sharpen this. First, the discrepancy is not a choice of flotation
+plane. Matching the published waterline length of Sysser 01 requires raising the hull
+\SI{1.9}{\milli\metre}, which costs \SI{5.6}{\percent} of the displaced volume; matching the
+beam requires \SI{3.8}{\milli\metre} and \SI{11}{\percent}. No single heave satisfies length,
+beam and volume together.
+
+Second, and decisively, the length-to-beam ratio is nearly independent of the flotation
+plane, so it isolates shape from datum. Over $\pm\SI{4}{\milli\metre}$ of heave --- a range
+spanning \SI{13}{\percent} of the displaced volume --- Sysser 01's ratio stays
+\SIrange{0.51}{0.68}{\percent} below the published value and never reaches it, while
+Sysser 50's spans \SIrange{-0.27}{0.27}{\percent} and passes through
+\SI{-0.03}{\percent} at the volume-matched datum. The supplied Sysser 01 surface is
+therefore a measurably different shape from the one its published row describes, by about
+\SI{0.6}{\percent} in length-to-beam ratio, and the supplied Sysser 50 surface is not.
+
+The consequence for the resistance comparison is a stated bias on one hull and not on the
+other. It would seem to be the smallest of the four causes, since \SI{0.6}{\percent} in a
+linear dimension is a couple of per cent in wave resistance against the factors of two to four
+that follow --- but section~5.4 finds that ordering contradicted by the resistance comparison
+itself and withdraws it.
+Wetted area, the only quantity whose discrepancy has the same sign on both hulls, does not
+enter the wave resistance at all; it enters the friction line used to reduce the measurement,
+and there a \SIrange{0.7}{2.1}{\percent} error in $S_c$ moves the residuary resistance by
+\SI{3}{\percent} of itself at $\Fn = 0.30$.
+
+\subsection{The running attitude is known, and it brackets rather than fixes the answer}
+
+Section~2.8 established that the release fixes the sinkage datum at the centre of gravity and
+that the pivot follows. The attitude can therefore be applied, and it was: at the pivot the
+release determines, over the speeds where the sinkage is a large fraction of the draught.
+
+It raises the prediction substantially and by an amount that tracks one quantity.
+On Sysser 01, at $\Fn = 0.40, 0.45, 0.50, 0.55$, the pressure route rises by \SI{59}{\percent}, \SI{83}{\percent}, \SI{103}{\percent}, \SI{74}{\percent} while the displaced volume below $z = 0$ rises by \SI{24}{\percent}, \SI{42}{\percent}, \SI{57}{\percent}, \SI{51}{\percent}. The resistance rise divided by the volume rise is \num{1.28}, \num{1.29}, \num{1.29}, \num{1.15}, so one quantity accounts for the effect to within \SI{12}{\percent} across the range.
+
+\begin{table}[htbp]
+\centering
+\caption{Effect of imposing the measured running attitude, rotating about the pivot the
+release determines, against running at the static attitude. The volume ratio is the
+displaced volume below $z = 0$ at the running attitude over its static value, and it is the
+quantity that explains the rest of the table.}
+\label{tab:attitude}
+\small
+\begin{tabular}{@{}lS[table-format=1.2]S[table-format=2.1]S[table-format=+1.2]
+S[table-format=1.3]S[table-format=2.2]S[table-format=2.2]S[table-format=2.2]
+S[table-format=+2.2]S[table-format=+2.2]@{}}
+\toprule
+& & {sink.} & {trim} & {$\nabla/\nabla_0$} & {$R_r$} &
+\multicolumn{2}{c}{$R_W$ pressure [\si{\newton}]} &
+\multicolumn{2}{c}{$R_W/R_r$} \\
+\cmidrule(lr){7-8}\cmidrule(lr){9-10}
+hull & {$\Fn$} & {[\si{\milli\metre}]} & {[\si{\degree}]} & & {[\si{\newton}]} &
+{static} & {running} & {static} & {running} \\
+\midrule
+Sysser 01 & 0.40 & 14.9 & -0.56 & 1.235 & 6.63 & 12.36 & 19.61 & +1.86 & +2.96 \\
+Sysser 01 & 0.45 & 25.0 & -1.62 & 1.420 & 15.50 & 6.94 & 12.72 & +0.45 & +0.82 \\
+Sysser 01 & 0.50 & 30.8 & -3.19 & 1.571 & 27.98 & 8.40 & 17.03 & +0.30 & +0.61 \\
+Sysser 01 & 0.55 & 23.9 & -4.67 & 1.512 & 38.94 & 16.79 & 29.25 & +0.43 & +0.75 \\
+Sysser 50 & 0.40 & 14.8 & -0.47 & 1.279 & 7.86 & 11.07 & 12.04 & +1.41 & +1.53 \\
+Sysser 50 & 0.45 & 19.6 & -1.20 & 1.397 & 17.41 & 19.00 & 25.80 & +1.09 & +1.48 \\
+Sysser 50 & 0.50 & 21.9 & -2.11 & 1.477 & 29.48 & 19.02 & 24.23 & +0.65 & +0.82 \\
+Sysser 50 & 0.55 & 21.0 & -2.67 & 1.482 & 37.97 & 17.30 & 23.67 & +0.46 & +0.62 \\
+Sysser 50 & 0.60 & 19.0 & -3.12 & 1.464 & 46.02 & 20.12 & 28.05 & +0.44 & +0.61 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The quantity it tracks is the displaced volume, and that identifies the mechanism as the
+linearisation rather than the attitude. A Neumann--Kelvin solve clips the hull at the
+undisturbed plane $z = 0$, whereas the real hull at speed sits in the trough of the wave it
+generates, so the volume below $z = 0$ genuinely exceeds the static value. Imposing the
+measured sinkage on the clipped hull therefore over-immerses it: the volume rises to \SIrange{24}{57}{\percent} above static
+across the speeds run here, and the predicted resistance rises with it, by \SIrange{59}{103}{\percent}.
+
+The two attitudes therefore bracket rather than bound the answer. The static attitude runs the
+hull too shallow and under-predicts in the upper range; the measured attitude over-immerses it
+and over-predicts. On Sysser 01 the bracket is \numrange{0.30}{0.82} of measurement over $\Fn = 0.45$ to $0.55$. Neither end is the prediction, and a
+linearised free surface cannot narrow the interval, because doing so requires the wave
+elevation at the hull --- which is what the linearisation has assumed away. Quoting either end
+alone, as the first version of this report did in quoting the static value, understates the
+uncertainty by about a factor of two.
+
+One consequence is worth stating plainly, because it inverts an earlier conclusion. The
+undershoot at high $\Fn$ reported in the Results was attributed to running too shallow, and
+that attribution is confirmed: correcting the attitude removes most of it,
+taking Sysser 01 from \num{0.43} to \num{0.75} of measurement at $\Fn = 0.55$. What remains is no longer an
+attitude error.
+
+\subsection{Above \texorpdfstring{$\Fn \approx 0.45$}{Fn = 0.45} the wetted geometry is incomplete}
+
+Both files carry a second patch above the waterline, which the hydrostatics exclude and check
+for immersion rather than ignore. At the static attitude both clear the free surface --- by
+\SI{40.9}{\milli\metre} on Sysser 50 and \SI{81.5}{\milli\metre} on Sysser 01. At the
+measured attitude they do not: the excluded patch of Sysser 50 reaches the free surface at
+$\Fn = 0.45$ and is \SI{18.9}{\milli\metre} below it at $\Fn = 0.50$ and
+\SI{35.4}{\milli\metre} at $\Fn = 0.65$, and that of Sysser 01 at $\Fn = 0.50$ and
+\SI{28.3}{\milli\metre} at $\Fn = 0.60$.
+
+The panel mesh is built from the wetted patch alone, so above those speeds it omits hull
+surface that is genuinely wetted at the attitude imposed. Sysser 50 crosses first because its
+after body is wide and shallow. This is a second reason the upper range is not predictable as
+the code stands, independent of the linearisation argument above, and unlike that one it is
+fixable: the excluded patch would have to enter the mesh, and the immersion check that
+currently warns would have to gate the solve rather than the report.
+
+\subsection{Beam penalises the low-speed end only, and not the comparison}
+
+The remaining discrepancy is discretisation error, and the second hull was chosen to measure
+its dependence on beam. Sysser 50's beam-to-draught ratio is \num{6.34} against \num{3.99}, and the
+oscillation count of a panel pair grows as $|y_i - y_j|/|z_i + z_j|$, so a beamier hull at
+equal panel count sits closer to the limit of the wave-angle quadrature's validity envelope:
+the worst count is \num{366} on the Sysser 50 mesh against \num{303} on the Sysser 01 mesh at $\Fn = 0.30$, with no pair outside the envelope on either.
+
+The expectation was that Sysser 50 would be the worse resolved and the worse predicted
+throughout. It is neither, and the result is more informative than the expectation.
+\begin{table}[htbp]
+\centering
+\caption{The two hulls compared at the static attitude on the diagnostics that measure
+discretisation error, split at $\Fn = 0.25$. The residual is the root-mean-square
+body-condition residual at points that are not collocation points, as a fraction of $u$; the
+last column is the ratio of the far-field route to the pressure route, which is unity for a
+converged solution.}
+\label{tab:compare}
+\small
+\begin{tabular}{@{}lcccccc@{}}
+\toprule
+& & residual, & \multicolumn{2}{c}{residual, $\Fn \ge 0.25$}
+& \multicolumn{2}{c}{$\Fn \ge 0.25$} \\
+\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+hull & $N$ & $\Fn < 0.25$ & mean & max & $R_W/R_r$ & far\,/\,pressure \\
+\midrule
+Sysser 01 & 280 & 0.066--0.147 & 0.116 & 0.134 & -0.46--+3.09 & 1.04--3.61 \\
+Sysser 50 & 320 & 0.166--0.297 & 0.087 & 0.095 & +0.44--+2.13 & 0.95--1.79 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The beam penalty is real but confined to the bottom of the range. Below $\Fn = 0.25$ the
+body-condition residual on Sysser 50 is \numrange{0.166}{0.297} of $u$ against \numrange{0.066}{0.147} on Sysser 01 --- two
+to four times worse --- which is where the wavelength is shortest relative to a panel and
+where the oscillation count therefore binds. Above $\Fn = 0.25$ the ordering reverses on
+every measure: the mean residual is \num{0.087} of $u$ on Sysser 50 against \num{0.116} on Sysser 01, the ratio of prediction to measurement spans \numrange{0.44}{2.13} against \numrange{-0.46}{3.09}, and the two resistance routes differ by at most a factor of \num{1.79} against \num{3.61}. Sysser 50 also keeps its predicted resistance positive at every speed,
+where Sysser 01 returns a negative value at two.
+
+Two conclusions follow, and the second was not anticipated. First, beam is not the
+discriminator for the quality of the comparison; the resolved wave spectrum is, and it is the
+low-speed end that is short of it on both hulls. Second, the hull whose geometry reconciles
+with its published row is also the hull whose resistance reconciles better --- which is the
+opposite of the ordering asserted earlier in this section, where the geometry discrepancy was
+ranked the smallest of the four causes on the grounds that \SI{0.6}{\percent} in a linear
+dimension is a couple of per cent in resistance. That argument is sound for a small
+perturbation and it does not account for what is seen here. Two hulls cannot separate
+geometry fidelity from hull form, so no attribution is made: the observation is recorded, the
+ranking is withdrawn, and settling it needs a third hull whose file and published row agree
+and whose form resembles Sysser 01's.
+
+A final observation supports reading the upper range as physics rather than arithmetic. Above
+$\Fn = 0.45$ the two independent resistance routes agree on Sysser 50 to
+\SI{7}{\percent} or better, so discretisation error is demonstrably small there --- and the prediction is
+still only \numrange{0.44}{1.09} of measurement. Where the numerics are converged the model is still
+short, which points at the causes this section has already named: the omitted immersed
+surface, the attitude bracket, and the fact that residuary resistance is not wave resistance
+but contains nonlinear and viscous-form contributions that grow with speed.
+
 \section{Capabilities and Limitations}
 \subsection{Capabilities}
 
-The code delivers the following, each of which is verified against something outside
-itself.
+The code delivers the following on both hulls run here, each verified against something
+outside itself.
 
 \textit{Geometry.} It reads an IGES~5.3 file and evaluates the NURBS surface through the
-Cox--de Boor recurrence, checking surface derivatives against a derivative patch built
+Cox--de Boor recurrence, detecting which surface parameter runs around the girth rather than
+assuming it, checking surface derivatives against a derivative patch built
 independently from differences of control points, to 1 part in $10^{11}$. Hydrostatics
 converge at second order and are exact to 1 part in $10^{12}$ on a rectangular box.
 Plane sections classify vertices lying on the cut plane explicitly, which is not a nicety:
@@ -709,8 +1089,12 @@ the wave surface it generates. Depth is infinite and the attitude is prescribed:
 and trim are not solved as an equilibrium. The output is the wave resistance of a bare
 canoe body and nothing else.
 
-\textit{Limits of the discretisation.} The density is piecewise constant, which is first
-order on a curved body, and the wave influences use the centroid rule over the source
+\textit{Limits of the discretisation.} The body-fitted mesh assumed until now that the
+first surface parameter runs around the girth. That holds for the Sysser 01 file and not for
+the Sysser 50 file in the same release; the convention is now detected and the patch
+transposed on loading, but the episode is worth recording because uniform tessellation, and
+therefore every hydrostatic quantity, was indifferent to it. The density is piecewise
+constant, which is first order on a curved body, and the wave influences use the centroid rule over the source
 panel, which carries a bias of order 10 per cent at 158 panels whose sign depends on which
 resistance route is read. Assembly costs \SI{1164}{\micro\second} per panel pair, so the
 influence matrix alone is 28 minutes at 1200 panels with the pressure route's gradient
@@ -723,24 +1107,28 @@ estimate. The spectral cut-off can fall below the physical lower limit $\lambda 
 Froude number, and the reported resistance is then not meaningful even though it is
 returned.
 
-\textit{Limits set by the input data.} Three quantities of the supplied geometry disagree
-with the published DSYHS hydrostatics by \SIrange{0.5}{2.1}{\percent}, attributed to the
-file being a 2012 re-measurement rather than the towed hull; the attribution is unproven
-and the discrepancy is carried as a bias. The measured quantity available for comparison is
+\textit{Limits set by the input data.} Three quantities of the supplied Sysser 01 geometry
+disagree with the published DSYHS hydrostatics by \SIrange{0.5}{2.1}{\percent}. The
+repository attributes this to the file being a 2012 re-measurement rather than the towed
+hull; Sysser 50's file carries the same header and agrees with its own published row to
+\SI{0.04}{\percent} in length and \SI{0.002}{\percent} in beam, so the attribution cannot
+be a systematic property of the release and the discrepancy is hull-specific. It is carried
+as a stated bias on Sysser 01 and not assumed away. The measured quantity available for comparison is
 residuary resistance, which is not a measurement but the result of subtracting an ITTC-57
 friction line at form factor zero, and therefore contains nonlinear and viscous-form
-contributions as well as wave resistance. The release does not state where the dynamic
-sinkage was measured, and rotating about a different pivot is exactly equivalent to
-shifting the heave by (pivot uncertainty) $\times\tan(\text{trim})$, so the running
-attitude is undetermined above $\Fn \approx 0.40$: the ambiguity reaches
-\SI{44}{\milli\metre} at $\Fn = 0.50$ against a \SI{31}{\milli\metre} measured sinkage.
-Since the speeds at which the attitude is known are the speeds at which the measured
-residuary resistance is smallest, the two windows do not overlap.
+contributions as well as wave resistance. The running attitude is known --- the release's Info
+sheet fixes the sinkage datum at the centre of gravity, and the pivot with it --- but it
+cannot be applied usefully in the upper range, for a reason that belongs to the
+linearisation rather than to the data: imposing the measured sinkage on a hull clipped at
+the undisturbed plane $z = 0$ raises the displaced volume by \SIrange{24}{57}{\percent} above static, because the real hull
+at speed sits in the trough of its own wave while the model hull does not. The prediction
+then over-immerses and over-predicts. Above $\Fn \approx 0.45$ the running attitude also
+immerses hull surface that the wetted-surface model excludes, so the geometry itself is
+incomplete there.
 
 \section{Conclusions}
 The code implements the Neumann--Kelvin problem for a bare canoe body as it states, and the
-implementation is correct at the level its own oracles can resolve. Its test suite of 160
-tests passes. The displaced volume computed by four independent applications of the
+implementation is correct at the level its own oracles can resolve. Its test suite of 183 tests passes. The displaced volume computed by four independent applications of the
 divergence theorem agrees to \num{3.0e-15}, and the hydrostatics converge at second order to a
 Richardson extrapolant of \SI{0.0376266}{\metre\cubed}. The Kelvin Green function satisfies
 the linearised free-surface condition to \num{3.8e-08}, a property the code never imposes
@@ -758,6 +1146,19 @@ not, and the resistance constant $\rho g^2/(\uppi u^4)$ is confirmed end to end 
 independently evaluated Michell integral. What is not established is a wave resistance for
 this hull that could be used in place of the series regression.
 
+Running the second hull identified where the discrepancies come from, and they are four
+separable things rather than one. The geometry discrepancy is specific to Sysser 01, whose
+supplied surface differs from its published row by \SI{0.6}{\percent} in a quantity that no
+flotation plane can adjust, while Sysser 50's agrees to \SI{0.03}{\percent}; it is also the
+smallest of the four. The running attitude is determined by the release and not, as
+previously recorded, undetermined, but imposing it on a hull clipped at the undisturbed plane
+over-immerses that hull, so the two attitudes bracket the answer at about a factor of two and
+the linearisation cannot do better. Above $\Fn \approx 0.45$ the running attitude immerses
+hull surface the wetted-surface model excludes, so the geometry is incomplete there. And the
+largest cause is discretisation error, which the second hull measures against beam: at
+comparable panel counts the beamier hull carries the larger body-condition residual, on the
+diagnostic the solve never sees.
+
 Three conclusions follow for anyone using the code. Quote the pressure route, with the
 far-field value beside it as an upper bound, because the far-field integral is
 positive-definite in the source density and its discretisation error is one-sided. Read the
@@ -773,9 +1174,10 @@ interpolating the Kelvin kernel would recover the factor of ten in throughput th
 converged mesh needs, and pointwise accuracy is now established well enough for that to be
 safe. Replacing the piecewise-constant density with a linear one would address the
 first-order convergence that is the actual cause rather than its cost. Independently of
-either, obtaining the reference point for the measured sinkage would open the range above
-$\Fn = 0.40$, where the measured residuary resistance is several per cent of displacement
-weight and an error in the prediction would be visible against it.
+either, the upper range now needs two things that are not mesh refinement: the excluded patch
+brought into the panel mesh, so that the wetted geometry at the running attitude is complete;
+and a free-surface condition applied at the wave elevation rather than at $z = 0$, without
+which the attitude bracket cannot be narrowed.
 
 \begin{thebibliography}{9}
 \bibitem[Gerritsma et al.(1981)]{gerritsma1981}
