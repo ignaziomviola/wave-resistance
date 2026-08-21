@@ -861,3 +861,50 @@ workbook places the towing point 255 mm above the waterline and the transducers 
 forward and 0.46336 m aft of the centre of gravity, but does not say where the sinkage was
 measured. Below $Fn = 0.35$ the trim is under 0.11° so the choice hardly matters; by
 $Fn = 0.50$ it is 3.2° and it matters a great deal.
+
+## 21. The measured attitude cannot be applied above Fn ≈ 0.35
+
+The plan requires the resistance comparison to be made at the recorded dynamic sinkage and
+trim. That turns out not to be possible over most of the speed range, for a reason that is
+in the data rather than in the code.
+
+**First, an error of mine.** `Attitude` rotates about `pivot`, which defaults to the origin.
+In this IGES file the origin sits at the **aft end of the waterline** — the wetted extent
+runs from $x = -0.0064$ m to $x = 1.6017$ m — so the default pivot is half a waterline length
+from the midpoint. Applying the measured trim about it raises the bow by
+$1.6\tan(5.27°) = 148$ mm at $Fn = 0.60$, against a canoe-body draught of 127 mm, and
+removes over half the immersed volume. The first sweep did exactly that and its numbers are
+discarded, not reported.
+
+**Second, and not fixable.** Rotating about pivot $P$ with trim $\theta$ and heave $s$ is the
+same rigid motion as rotating about $Q$ with the same $\theta$ and heave
+$s + (x_Q - x_P)\tan\theta$. The pivot is therefore not an independent choice: it is exactly
+equivalent to an ambiguity in the heave, of size (pivot uncertainty) × $\tan\theta$. The
+release states the sinkage and the trim but **not where the sinkage was measured**, and the
+sensible candidates — the aft end of the waterline, its midpoint, the centre of buoyancy, the
+centre of flotation — span 0.80 m. Hence:
+
+| $Fn$ | 0.20 | 0.30 | 0.35 | 0.40 | 0.45 | 0.50 | 0.60 |
+|---|---|---|---|---|---|---|---|
+| measured sinkage, mm | 2.70 | 6.57 | 10.42 | 14.93 | 24.96 | 30.77 | 21.22 |
+| heave ambiguity, mm | 0.14 | 0.44 | 1.40 | 7.86 | 22.58 | 44.39 | 73.57 |
+| ambiguity / sinkage | 0.05 | 0.07 | 0.13 | 0.53 | 0.90 | 1.44 | 3.47 |
+
+Up to $Fn = 0.35$ the ambiguity is at most 1.4 mm, 13 per cent of the sinkage, and the
+attitude is effectively determined. At $Fn = 0.45$ it equals the sinkage. Above $Fn = 0.50$
+it exceeds it, and the attitude is simply not determined by the published data.
+
+**The two windows do not overlap.** The speeds at which the attitude is known are the speeds
+at which the measured residuary resistance is smallest — 2.27 N and 0.6 per cent of
+displacement weight at $Fn = 0.35$, against 27.98 N and 7.6 per cent at $Fn = 0.50$. So the
+range where the target is worth predicting is the range where the condition to predict it at
+is unknown. Resolving this needs the reference point for $z$, which is a question for the
+dataset's authors, not for more computation.
+
+One caution about a test that looks like a discriminator and is not. It is tempting to pick
+the pivot that best conserves the immersed volume, on the grounds that the model's weight does
+not change. That reasoning is wrong. In linearised theory the hull is clipped at the
+*undisturbed* plane $z = 0$ by construction, while the real hull at speed sits in a trough of
+its own making, so the volume below $z = 0$ genuinely exceeds the static value and by a large
+margin — 150 per cent of it at $Fn = 0.50$ with a mid-hull pivot. That is the linearisation's
+own bookkeeping and carries no information about the pivot.
